@@ -83,11 +83,32 @@ export interface PageDetailInspection extends ScanRoute {
   }[];
 }
 
-export function useScans(projectId?: string) {
+export interface PaginatedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export function useScans(params?: { projectId?: string; page?: number; pageSize?: number }) {
   return useQuery({
-    queryKey: scansKeys.lists(projectId),
-    queryFn: () => client.scans.list(projectId ? { projectId } : undefined) as Promise<ScanDetail[]>,
+    queryKey: scansKeys.lists(params),
+    queryFn: () => client.scans.list(params) as unknown as Promise<PaginatedResult<ScanDetail>>,
     refetchInterval: 4000
+  });
+}
+
+export function useScanRoutes(params: {
+  id: string;
+  healthStatus?: "all" | "healthy" | "warning" | "failed";
+  page?: number;
+  pageSize?: number;
+}) {
+  return useQuery({
+    queryKey: scansKeys.routes(params.id, params),
+    queryFn: () => (client.scans as any).listRoutes(params) as Promise<PaginatedResult<ScanRoute>>,
+    enabled: Boolean(params.id),
   });
 }
 

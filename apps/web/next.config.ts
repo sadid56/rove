@@ -7,18 +7,19 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/rpc/:path*",
-        destination: `${API_SERVER_URL}/rpc/:path*`
+        destination: `${API_SERVER_URL}/rpc/:path*`,
       },
       {
         source: "/rpc",
-        destination: `${API_SERVER_URL}/rpc`
+        destination: `${API_SERVER_URL}/rpc`,
       },
       {
         source: "/api/v1/:path*",
-        destination: `${API_SERVER_URL}/api/v1/:path*`
-      }
+        destination: `${API_SERVER_URL}/api/v1/:path*`,
+      },
     ];
-  }
+  },
+  devIndicators: false,
 };
 
 export default nextConfig;

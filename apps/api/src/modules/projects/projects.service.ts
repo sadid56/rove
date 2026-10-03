@@ -1,20 +1,10 @@
-import { db } from "@repo/database";
+import { db, QueryBuilder } from "@repo/database";
 import { projects } from "@repo/database/schema";
 import { eq, desc } from "drizzle-orm";
-import type { CreateProjectInput } from "./projects.schemas";
+import type { CreateProjectInput } from "@repo/contract";
 
 export class ProjectsService {
-  async create(input: {
-    name: string;
-    baseUrl: string;
-    crawlerConfig?: {
-      maxPages?: number;
-      sameOrigin?: boolean;
-      respectRobots?: boolean;
-      excludedPaths?: string[];
-      maxConcurrency?: number;
-    };
-  }) {
+  async create(input: CreateProjectInput) {
     const slug = input.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -38,13 +28,23 @@ export class ProjectsService {
     return created;
   }
 
-  async list() {
-    return db.select().from(projects).orderBy(desc(projects.createdAt));
+  async list(query?: { search?: string; page?: number; pageSize?: number }) {
+    if (query?.page || query?.search) {
+      return QueryBuilder.from(db, projects)
+        .search(query.search, [projects.name, projects.url])
+        .orderBy(desc(projects.createdAt))
+        .paginate({ page: query.page, pageSize: query.pageSize })
+        .execute();
+    }
+    return QueryBuilder.from(db, projects)
+      .orderBy(desc(projects.createdAt))
+      .findMany();
   }
 
   async findById(id: string) {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    return project ?? null;
+    return QueryBuilder.from(db, projects)
+      .where(eq(projects.id, id))
+      .findFirst();
   }
 
   async delete(id: string) {

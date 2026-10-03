@@ -8,11 +8,12 @@ export async function POST() {
   cookieStore.delete("better-auth.dont_remember");
 
   try {
-    const apiUrl = process.env.API_URL || "http://localhost:4000";
-    await fetch(`${apiUrl}/api/v1/auth/sign-out`, { method: "POST" });
-  } catch {
-    // ignore
-  }
+    const apiUrl = process.env.API_URL;
+    await fetch(`${apiUrl}/api/v1/auth/sign-out`, {
+      method: "POST",
+      headers: { Origin: "http://localhost:3000" },
+    });
+  } catch {}
 
   const response = NextResponse.json({ success: true });
   response.cookies.delete("better-auth.session_token");

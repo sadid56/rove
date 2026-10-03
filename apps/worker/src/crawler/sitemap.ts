@@ -39,7 +39,6 @@ export async function discoverSitemapRoutes(targetUrl: string): Promise<string[]
         });
       }
     } catch {
-      // Continue to next candidate
     }
   }
 

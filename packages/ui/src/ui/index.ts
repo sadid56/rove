@@ -8,3 +8,6 @@ export * from "./sheet";
 export * from "./skeleton";
 export * from "./table";
 export * from "./tabs";
+export * from "./logo";
+export * from "./data-table";
+export * from "./breadcrumb";

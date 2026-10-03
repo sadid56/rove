@@ -1,26 +1,15 @@
-import { os, ORPCError } from "@orpc/server";
-import { z } from "zod";
+import { implement, ORPCError } from "@orpc/server";
+import { scanContract } from "@repo/contract";
 import { scansService } from "./scans.service";
 
-export const listScans = os
-  .route({
-    method: "GET",
-    path: "/scans",
-    summary: "List all scans"
-  })
-  .input(z.object({ projectId: z.string().optional() }).optional())
-  .handler(async ({ input }) => {
-    return await scansService.list(input?.projectId);
-  });
+export const listScans = implement(scanContract.list).handler(
+  async ({ input }) => {
+    return await scansService.list(input);
+  }
+);
 
-export const getScan = os
-  .route({
-    method: "GET",
-    path: "/scans/{id}",
-    summary: "Get scan details, health metrics, and route results"
-  })
-  .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
+export const getScan = implement(scanContract.get).handler(
+  async ({ input }) => {
     const scan = await scansService.findById(input.id);
     if (!scan) {
       throw new ORPCError("NOT_FOUND", {
@@ -28,16 +17,17 @@ export const getScan = os
       });
     }
     return scan;
-  });
+  }
+);
 
-export const getPageDetail = os
-  .route({
-    method: "GET",
-    path: "/scans/page/{pageId}",
-    summary: "Get detailed inspection of a specific tested page"
-  })
-  .input(z.object({ pageId: z.string() }))
-  .handler(async ({ input }) => {
+export const listScanRoutes = implement(scanContract.listRoutes).handler(
+  async ({ input }) => {
+    return await scansService.listRoutes(input);
+  }
+);
+
+export const getPageDetail = implement(scanContract.getPageDetail).handler(
+  async ({ input }) => {
     const page = await scansService.getPageDetail(input.pageId);
     if (!page) {
       throw new ORPCError("NOT_FOUND", {
@@ -45,53 +35,17 @@ export const getPageDetail = os
       });
     }
     return page;
-  });
+  }
+);
 
-export const createScan = os
-  .route({
-    method: "POST",
-    path: "/scans",
-    summary: "Trigger a new real-browser production QA scan"
-  })
-  .input(
-    z.object({
-      targetUrl: z.string().url(),
-      projectId: z.string().optional(),
-      options: z
-        .object({
-          maxPages: z.number().optional(),
-          captureScreenshots: z.boolean().optional(),
-          fullPageScreenshots: z.boolean().optional(),
-          maxConcurrency: z.number().optional()
-        })
-        .optional()
-    })
-  )
-  .handler(async ({ input }) => {
+export const createScan = implement(scanContract.create).handler(
+  async ({ input }) => {
     return await scansService.create(input);
-  });
+  }
+);
 
-export const updateScanStatus = os
-  .route({
-    method: "PATCH",
-    path: "/scans/{id}/status",
-    summary: "Update the status of a scan job"
-  })
-  .input(
-    z.object({
-      id: z.string(),
-      status: z.enum([
-        "queued",
-        "discovering",
-        "scanning",
-        "analyzing",
-        "completed",
-        "failed",
-        "cancelled"
-      ])
-    })
-  )
-  .handler(async ({ input }) => {
+export const updateScanStatus = implement(scanContract.updateStatus).handler(
+  async ({ input }) => {
     const updated = await scansService.updateStatus(input.id, input.status);
     if (!updated) {
       throw new ORPCError("NOT_FOUND", {
@@ -99,11 +53,13 @@ export const updateScanStatus = os
       });
     }
     return updated;
-  });
+  }
+);
 
 export const scanRouter = {
   list: listScans,
   get: getScan,
+  listRoutes: listScanRoutes,
   getPageDetail,
   create: createScan,
   updateStatus: updateScanStatus

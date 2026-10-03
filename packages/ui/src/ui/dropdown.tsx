@@ -37,7 +37,6 @@ export function Dropdown({
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click and Escape key
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -113,7 +112,7 @@ export function DropdownMenu({
   return (
     <div
       className={cn(
-        "absolute z-50 mt-2 min-w-[12rem] rounded-xl border border-zinc-800 bg-zinc-900/95 p-1.5 text-zinc-200 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100",
+        "absolute z-50 mt-2 min-w-[12rem] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100",
         align === "right" ? "right-0" : "left-0",
         className
       )}
@@ -152,8 +151,8 @@ export function DropdownItem({
       className={cn(
         "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors text-left select-none cursor-pointer",
         variant === "default"
-          ? "text-zinc-300 hover:bg-zinc-800/80 hover:text-white"
-          : "text-rose-400 hover:bg-rose-950/40 hover:text-rose-300",
+          ? "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          : "text-destructive hover:bg-destructive/15 hover:text-destructive",
         className
       )}
     >
@@ -168,7 +167,7 @@ export function DropdownSeparator({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("my-1 h-px bg-zinc-800/80 -mx-1", className)}
+      className={cn("my-1 h-px bg-border -mx-1", className)}
       role="separator"
     />
   );

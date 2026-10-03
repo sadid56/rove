@@ -1,4 +1,4 @@
-import { db } from "@repo/database";
+import { db, QueryBuilder } from "@repo/database";
 import {
   scans,
   scanRoutes,
@@ -9,7 +9,7 @@ import {
   regressions
 } from "@repo/database/schema";
 import { eq, desc } from "drizzle-orm";
-import type { CreateScanInput } from "./scans.schemas";
+import type { CreateScanInput } from "@repo/contract";
 
 export class ScansService {
   async create(input: CreateScanInput) {
@@ -33,31 +33,51 @@ export class ScansService {
     return created;
   }
 
-  async list(projectId?: string) {
-    if (projectId) {
-      return db
-        .select()
-        .from(scans)
-        .where(eq(scans.projectId, projectId as any))
-        .orderBy(desc(scans.createdAt));
-    }
-    return db.select().from(scans).orderBy(desc(scans.createdAt));
+  async list(query?: { projectId?: string; search?: string; page?: number; pageSize?: number }) {
+    return QueryBuilder.from(db, scans)
+      .whereIf(Boolean(query?.projectId), () => eq(scans.projectId, query!.projectId as any))
+      .search(query?.search, [scans.targetUrl])
+      .orderBy(desc(scans.createdAt))
+      .paginate({ page: query?.page, pageSize: query?.pageSize })
+      .execute();
+  }
+
+  async listRoutes(query: {
+    id: string;
+    search?: string;
+    healthStatus?: "all" | "healthy" | "warning" | "failed";
+    page?: number;
+    pageSize?: number;
+  }) {
+    const healthFilter =
+      query.healthStatus && query.healthStatus !== "all"
+        ? (query.healthStatus as "healthy" | "warning" | "failed")
+        : undefined;
+
+    return QueryBuilder.from(db, pageResults)
+      .where(eq(pageResults.scanId, query.id as any))
+      .whereIf(Boolean(healthFilter), () => eq(pageResults.healthStatus, healthFilter!))
+      .search(query.search, [pageResults.path, pageResults.url])
+      .orderBy(desc(pageResults.createdAt))
+      .paginate({ page: query.page, pageSize: query.pageSize })
+      .execute();
   }
 
   async findById(id: string) {
-    const [scan] = await db.select().from(scans).where(eq(scans.id, id as any));
+    const scan = await QueryBuilder.from(db, scans)
+      .where(eq(scans.id, id as any))
+      .findFirst();
+
     if (!scan) return null;
 
-    const routes = await db
-      .select()
-      .from(pageResults)
+    const routes = await QueryBuilder.from(db, pageResults)
       .where(eq(pageResults.scanId, id as any))
-      .orderBy(desc(pageResults.createdAt));
+      .orderBy(desc(pageResults.createdAt))
+      .findMany();
 
-    const scanRegressions = await db
-      .select()
-      .from(regressions)
-      .where(eq(regressions.currentScanId, id as any));
+    const scanRegressions = await QueryBuilder.from(db, regressions)
+      .where(eq(regressions.currentScanId, id as any))
+      .findMany();
 
     return {
       ...scan,
@@ -67,27 +87,23 @@ export class ScansService {
   }
 
   async getPageDetail(pageResultId: string) {
-    const [page] = await db
-      .select()
-      .from(pageResults)
-      .where(eq(pageResults.id, pageResultId as any));
+    const page = await QueryBuilder.from(db, pageResults)
+      .where(eq(pageResults.id, pageResultId as any))
+      .findFirst();
 
     if (!page) return null;
 
-    const cEvents = await db
-      .select()
-      .from(consoleEvents)
-      .where(eq(consoleEvents.pageResultId, pageResultId as any));
-
-    const rErrors = await db
-      .select()
-      .from(runtimeErrors)
-      .where(eq(runtimeErrors.pageResultId, pageResultId as any));
-
-    const nRequests = await db
-      .select()
-      .from(networkRequests)
-      .where(eq(networkRequests.pageResultId, pageResultId as any));
+    const [cEvents, rErrors, nRequests] = await Promise.all([
+      QueryBuilder.from(db, consoleEvents)
+        .where(eq(consoleEvents.pageResultId, pageResultId as any))
+        .findMany(),
+      QueryBuilder.from(db, runtimeErrors)
+        .where(eq(runtimeErrors.pageResultId, pageResultId as any))
+        .findMany(),
+      QueryBuilder.from(db, networkRequests)
+        .where(eq(networkRequests.pageResultId, pageResultId as any))
+        .findMany(),
+    ]);
 
     return {
       ...page,

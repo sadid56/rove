@@ -4,10 +4,6 @@ const CDN_URL = (
   ""
 ).replace(/\/+$/, "");
 
-/**
- * Resolves a screenshot key into a full CDN URL using the domain configured in environment variables.
- * Enables zero-downtime CDN domain migration without changing any database records.
- */
 export function getMediaUrl(path?: string | null): string {
   if (!path) return "";
   if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {

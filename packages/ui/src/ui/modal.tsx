@@ -57,7 +57,7 @@ export function Modal({
       {/* Modal Dialog */}
       <div
         className={cn(
-          "relative z-50 w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900/95 p-6 text-zinc-100 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-200",
+          "relative z-50 w-full max-w-lg rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-200",
           className
         )}
         role="dialog"
@@ -66,12 +66,12 @@ export function Modal({
         <div className="flex items-start justify-between pb-4">
           <div className="space-y-1">
             {title && (
-              <h2 className="text-lg font-semibold tracking-tight text-white">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 {title}
               </h2>
             )}
             {description && (
-              <p className="text-xs text-zinc-400 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 {description}
               </p>
             )}
@@ -79,7 +79,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+            className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
             aria-label="Close"
           >
             <svg
@@ -101,7 +101,7 @@ export function Modal({
         <div className="py-2">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800/80 mt-4">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-4">
             {footer}
           </div>
         )}

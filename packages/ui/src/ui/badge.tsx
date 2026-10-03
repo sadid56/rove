@@ -15,36 +15,27 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 
 export function Badge({
   variant = "neutral",
-  dot = false,
+  dot,
   children,
   className,
   ...props
 }: BadgeProps) {
   const baseStyles =
-    "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium border select-none transition-colors";
+    "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border select-none transition-colors";
 
   const variantStyles = {
     healthy:
-      "bg-emerald-950/40 text-emerald-400 border-emerald-800/50 shadow-sm shadow-emerald-950/20",
+      "bg-success/15 text-success border-success/30 shadow-xs",
     warning:
-      "bg-amber-950/40 text-amber-400 border-amber-800/50 shadow-sm shadow-amber-950/20",
+      "bg-warning/15 text-warning border-warning/30 shadow-xs",
     failed:
-      "bg-rose-950/40 text-rose-400 border-rose-800/50 shadow-sm shadow-rose-950/20",
+      "bg-destructive/15 text-destructive border-destructive/30 shadow-xs",
     info:
-      "bg-cyan-950/40 text-cyan-400 border-cyan-800/50 shadow-sm shadow-cyan-950/20",
+      "bg-primary/15 text-primary border-primary/30 shadow-xs",
     neutral:
-      "bg-zinc-800/60 text-zinc-300 border-zinc-700/50",
+      "bg-secondary text-secondary-foreground border-border",
     indigo:
-      "bg-indigo-950/40 text-indigo-400 border-indigo-800/50",
-  };
-
-  const dotColors = {
-    healthy: "bg-emerald-400 animate-pulse",
-    warning: "bg-amber-400",
-    failed: "bg-rose-400 animate-pulse",
-    info: "bg-cyan-400",
-    neutral: "bg-zinc-400",
-    indigo: "bg-indigo-400",
+      "bg-primary/15 text-primary border-primary/30",
   };
 
   return (
@@ -52,12 +43,6 @@ export function Badge({
       className={cn(baseStyles, variantStyles[variant], className)}
       {...props}
     >
-      {dot && (
-        <span
-          className={cn("w-1.5 h-1.5 rounded-full", dotColors[variant])}
-          aria-hidden="true"
-        />
-      )}
       {children}
     </span>
   );

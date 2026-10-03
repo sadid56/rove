@@ -1,18 +1,12 @@
-import { os, ORPCError } from "@orpc/server";
-import { z } from "zod";
+import { implement, ORPCError } from "@orpc/server";
+import { authContract, userContract } from "@repo/contract";
 import { auth } from "../../lib/auth";
 import { db } from "@repo/database";
 import { users } from "@repo/database/schema";
 import { eq, ilike } from "drizzle-orm";
 
-export const signIn = os
-  .route({
-    method: "POST",
-    path: "/auth/sign-in",
-    summary: "Sign in with email and password"
-  })
-  .input(z.object({ email: z.string().email(), password: z.string() }))
-  .handler(async ({ input }) => {
+export const signIn = implement(authContract.signIn).handler(
+  async ({ input }) => {
     try {
       const res = await auth.api.signInEmail({
         body: { email: input.email, password: input.password }
@@ -23,22 +17,11 @@ export const signIn = os
         message: err?.message || "Invalid email or password"
       });
     }
-  });
+  }
+);
 
-export const signUp = os
-  .route({
-    method: "POST",
-    path: "/auth/sign-up",
-    summary: "Register a new user account"
-  })
-  .input(
-    z.object({
-      email: z.string().email(),
-      password: z.string().min(4),
-      name: z.string().min(2)
-    })
-  )
-  .handler(async ({ input }) => {
+export const signUp = implement(authContract.signUp).handler(
+  async ({ input }) => {
     try {
       const res = await auth.api.signUpEmail({
         body: {
@@ -53,26 +36,15 @@ export const signUp = os
         message: err?.message || "Failed to create account"
       });
     }
-  });
+  }
+);
 
-export const signOut = os
-  .route({
-    method: "POST",
-    path: "/auth/sign-out",
-    summary: "Sign out current session"
-  })
-  .handler(async () => {
-    return { success: true };
-  });
+export const signOut = implement(authContract.signOut).handler(async () => {
+  return { success: true };
+});
 
-export const forgotPassword = os
-  .route({
-    method: "POST",
-    path: "/auth/forgot-password",
-    summary: "Request password reset link"
-  })
-  .input(z.object({ email: z.string().email() }))
-  .handler(async ({ input }) => {
+export const forgotPassword = implement(authContract.forgotPassword).handler(
+  async ({ input }) => {
     try {
       await auth.api.requestPasswordReset({
         body: { email: input.email, redirectTo: "/reset-password" }
@@ -81,16 +53,11 @@ export const forgotPassword = os
     } catch {
       return { success: true, message: "Reset email sent if account exists" };
     }
-  });
+  }
+);
 
-export const resetPassword = os
-  .route({
-    method: "POST",
-    path: "/auth/reset-password",
-    summary: "Reset password using reset token"
-  })
-  .input(z.object({ token: z.string(), newPassword: z.string() }))
-  .handler(async ({ input }) => {
+export const resetPassword = implement(authContract.resetPassword).handler(
+  async ({ input }) => {
     try {
       await auth.api.resetPassword({
         body: { token: input.token, newPassword: input.newPassword }
@@ -101,16 +68,11 @@ export const resetPassword = os
         message: err?.message || "Failed to reset password"
       });
     }
-  });
+  }
+);
 
-export const listUsers = os
-  .route({
-    method: "GET",
-    path: "/users",
-    summary: "List all users"
-  })
-  .input(z.object({ search: z.string().optional() }).optional())
-  .handler(async ({ input }) => {
+export const listUsers = implement(userContract.list).handler(
+  async ({ input }) => {
     if (input?.search) {
       return await db
         .select()
@@ -118,42 +80,26 @@ export const listUsers = os
         .where(ilike(users.email, `%${input.search}%`));
     }
     return await db.select().from(users);
-  });
+  }
+);
 
-export const getUser = os
-  .route({
-    method: "GET",
-    path: "/users/{id}",
-    summary: "Get user by ID"
-  })
-  .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
+export const getUser = implement(userContract.getUser).handler(
+  async ({ input }) => {
     const [user] = await db.select().from(users).where(eq(users.id, input.id));
     if (!user) {
       throw new ORPCError("NOT_FOUND", { message: "User not found" });
     }
     return user;
-  });
+  }
+);
 
-export const getMe = os
-  .route({
-    method: "GET",
-    path: "/users/me",
-    summary: "Get current logged-in user profile"
-  })
-  .handler(async () => {
-    const [firstUser] = await db.select().from(users).limit(1);
-    return firstUser ?? null;
-  });
+export const getMe = implement(userContract.getMe).handler(async () => {
+  const [firstUser] = await db.select().from(users).limit(1);
+  return firstUser ?? null;
+});
 
-export const updateProfile = os
-  .route({
-    method: "PATCH",
-    path: "/users/profile",
-    summary: "Update user profile"
-  })
-  .input(z.object({ name: z.string().optional(), image: z.string().optional() }))
-  .handler(async ({ input }) => {
+export const updateProfile = implement(userContract.updateProfile).handler(
+  async ({ input }) => {
     const [firstUser] = await db.select().from(users).limit(1);
     if (!firstUser) throw new ORPCError("NOT_FOUND", { message: "User not found" });
 
@@ -168,22 +114,23 @@ export const updateProfile = os
       .returning();
 
     return updated;
-  });
+  }
+);
 
-export const toggleBan = os
-  .input(z.object({ userId: z.string(), banned: z.boolean(), reason: z.string().optional() }))
-  .handler(async () => ({ success: true }));
+export const toggleBan = implement(userContract.toggleBan).handler(
+  async () => ({ success: true })
+);
 
-export const updateRole = os
-  .input(z.object({ userId: z.string(), role: z.enum(["ADMIN", "MEMBER"]) }))
-  .handler(async () => ({ success: true }));
+export const updateRole = implement(userContract.updateRole).handler(
+  async () => ({ success: true })
+);
 
-export const deleteUser = os
-  .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
+export const deleteUser = implement(userContract.delete).handler(
+  async ({ input }) => {
     await db.delete(users).where(eq(users.id, input.id));
     return { success: true };
-  });
+  }
+);
 
 export const authRouter = {
   signIn,

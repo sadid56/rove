@@ -46,7 +46,6 @@ export async function createWorkerServer() {
     credentials: true
   });
 
-  // Root status
   app.get("/", async () => {
     const jobs = getActiveJobs();
     return {
@@ -60,7 +59,6 @@ export async function createWorkerServer() {
     };
   });
 
-  // Health check
   app.get("/health", async () => {
     const jobs = getActiveJobs();
     return {
@@ -73,7 +71,6 @@ export async function createWorkerServer() {
     };
   });
 
-  // Status & queue metrics
   app.get("/status", async () => {
     const queued = await db
       .select()
@@ -95,7 +92,6 @@ export async function createWorkerServer() {
     };
   });
 
-  // Trigger scan job on-demand
   app.post<{ Body: { scanId?: string; targetUrl?: string } }>("/jobs/run", async (req, reply) => {
     const { scanId, targetUrl } = req.body || {};
 
@@ -122,7 +118,6 @@ export async function createWorkerServer() {
       return reply.status(500).send({ error: "Failed to create or find scan" });
     }
 
-    // Trigger asynchronously without blocking reply
     runScan(targetScanId).catch((err) => {
       logger.error(`Error executing scan [${targetScanId}]:`, err);
     });
@@ -133,7 +128,6 @@ export async function createWorkerServer() {
     });
   });
 
-  // Cancel active scan
   app.post("/jobs/cancel", async (request, reply) => {
     const { scanId } = request.body as { scanId?: string };
     if (!scanId) {
@@ -149,7 +143,6 @@ export async function createWorkerServer() {
     return reply.send({ success: true, message: `Scan ${scanId} cancelled successfully` });
   });
 
-  // Get recent logs as JSON array
   app.get("/logs", async (req) => {
     const limit = Number((req.query as any)?.limit || 100);
     return {
@@ -158,14 +151,12 @@ export async function createWorkerServer() {
     };
   });
 
-  // Real-time log streaming via Server-Sent Events (SSE)
   app.get("/logs/stream", (request, reply) => {
     reply.raw.setHeader("Content-Type", "text/event-stream");
     reply.raw.setHeader("Cache-Control", "no-cache");
     reply.raw.setHeader("Connection", "keep-alive");
     reply.raw.setHeader("Access-Control-Allow-Origin", "*");
 
-    // Send the last 30 logs upon connecting
     const initialLogs = recentLogs.slice(-30);
     for (const log of initialLogs) {
       reply.raw.write(`data: ${JSON.stringify(log)}\n\n`);

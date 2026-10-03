@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { db } from "@repo/database";
 import { scans } from "@repo/database/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { runScan } from "./runner";
 import { logger } from "./utils/logger";
 import { createWorkerServer } from "./server";
@@ -12,10 +12,6 @@ const MAX_CONCURRENT_SCANS = Number(process.env.MAX_CONCURRENT_SCANS || 3);
 
 const runningScans = new Set<string>();
 
-/**
- * Checks the database for queued scans and executes up to MAX_CONCURRENT_SCANS in parallel.
- * Multiple users triggering scans simultaneously will run concurrently without blocking each other.
- */
 export async function processAvailableJobs(): Promise<void> {
   const availableSlots = MAX_CONCURRENT_SCANS - runningScans.size;
   if (availableSlots <= 0) {
@@ -36,7 +32,6 @@ export async function processAvailableJobs(): Promise<void> {
     if (runningScans.has(scan.id)) continue;
     runningScans.add(scan.id);
 
-    // Atomically claim the scan so another cycle doesn't pick it up
     await db
       .update(scans)
       .set({ status: "discovering", startedAt: new Date() })
@@ -46,7 +41,6 @@ export async function processAvailableJobs(): Promise<void> {
       `🚀 [Slot ${runningScans.size}/${MAX_CONCURRENT_SCANS}] Dispatched concurrent scan [${scan.id.slice(0, 8)}] -> ${scan.targetUrl}`
     );
 
-    // Execute asynchronously in parallel
     runScan(scan.id)
       .catch((err) => {
         logger.error(`Concurrent scan [${scan.id}] execution error:`, err);
@@ -72,7 +66,6 @@ export async function startWorkerServer(): Promise<void> {
     logger.error(`Failed to bind worker HTTP server on port ${WORKER_PORT}:`, err);
   }
 
-  // Polling loop to pick up new scans as soon as concurrency slots open
   const loop = async () => {
     try {
       await processAvailableJobs();

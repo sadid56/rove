@@ -37,24 +37,18 @@ export interface UploadScreenshotOptions {
   contentType?: string;
 }
 
-/**
- * Uploads a screenshot to Cloudflare R2 (or local dev storage fallback)
- * and returns ONLY the relative key path (e.g. `/screenshots/2026-10-02/scanId/route.jpeg`)
- * without domain name for flexible zero-downtime CDN domain migration.
- */
 export async function uploadScreenshot(options: UploadScreenshotOptions): Promise<string> {
   const { buffer, scanId, routePath, contentType = "image/jpeg" } = options;
 
   const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const dateStr = now.toISOString().slice(0, 10);
   const cleanScanId = scanId.slice(0, 8);
   const hash = crypto.createHash("md5").update(routePath + buffer.length).digest("hex").slice(0, 8);
   const safePathSlug = routePath.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 30) || "index";
   const extension = contentType.includes("png") ? "png" : "jpeg";
 
-  // Relative storage key (ONLY this is stored in database)
   const relativeKey = `/screenshots/${dateStr}/${cleanScanId}/${safePathSlug}-${hash}.${extension}`;
-  const s3Key = relativeKey.replace(/^\/+/, ""); // R2 / S3 keys do not have leading slash
+  const s3Key = relativeKey.replace(/^\/+/, "");
 
   if (s3Client && R2_BUCKET_NAME) {
     try {
@@ -74,7 +68,6 @@ export async function uploadScreenshot(options: UploadScreenshotOptions): Promis
     }
   }
 
-  // Graceful local disk fallback for dev without Cloudflare credentials
   try {
     const localDir = path.resolve(process.cwd(), "public", "screenshots", dateStr, cleanScanId);
     await fs.mkdir(localDir, { recursive: true });
@@ -88,9 +81,6 @@ export async function uploadScreenshot(options: UploadScreenshotOptions): Promis
   return relativeKey;
 }
 
-/**
- * Helper to build the full public CDN URL from a relative storage key
- */
 export function getStoragePublicUrl(relativeKey: string): string {
   if (!relativeKey) return "";
   if (relativeKey.startsWith("http://") || relativeKey.startsWith("https://") || relativeKey.startsWith("data:")) {

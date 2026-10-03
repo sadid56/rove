@@ -2,11 +2,20 @@ import type { FastifyPluginAsync } from "fastify";
 import { auth } from "../../lib/auth";
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
-  app.all("/auth/*", async (request, reply) => {
+  app.all("/*", async (request, reply) => {
     const url = `${request.protocol}://${request.hostname}${request.url}`;
     const headers = new Headers();
     for (const [key, value] of Object.entries(request.headers)) {
       if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+    }
+
+    if (!headers.get("origin")) {
+      const originFallback = request.headers.referer
+        ? new URL(request.headers.referer).origin
+        : request.headers["x-forwarded-host"]
+          ? `${request.protocol}://${request.headers["x-forwarded-host"]}`
+          : "http://localhost:3000";
+      headers.set("origin", originFallback);
     }
 
     const req = new Request(url, {

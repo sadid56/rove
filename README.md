@@ -1,159 +1,157 @@
-# Turborepo starter
+<div align="center">
 
-This Turborepo starter is maintained by the Turborepo core team.
+# 🛰️ ROVE
 
-## Using this example
+**Automated Production QA & Real-Browser Web Intelligence Platform**
 
-Run the following command:
+</div>
 
-```sh
-npx create-turbo@latest
+---
+
+## 📖 Overview
+
+**ROVE** is a production QA platform designed to eliminate manual smoke-testing after deployments. Instead of clicking through hundreds of routes or assuming that HTTP `200 OK` means your application works, **Rove** automatically crawls routes, inspects real client runtime execution in headless Chromium, intercepts broken background APIs, flags React hydration errors, and monitors deployment-to-deployment regressions.
+
+---
+
+## ✨ Key Features
+
+- **🌐 Autonomous Route Discovery:** Automatically parses `sitemap.xml`, `robots.txt`, and deep-crawls internal DOM links without manual route configuration.
+- **⚡ Real Browser Execution (Playwright):** Runs genuine Chromium instances to catch client-side JavaScript crashes, unhandled promise rejections, and React hydration mismatches.
+- **📡 Network & Asset Telemetry:** Differentiates page status from broken background API calls. Flags 404 missing stylesheets, broken scripts, failed fonts, and 5xx AJAX requests.
+- **🔄 Regression Detection:** Compares previous deployment scans against the latest run to pinpoint exact routes that degraded in performance or threw new errors.
+- **🔒 End-to-End Type Safety:** Strict contracts across frontend, API, and worker using **oRPC**, **Zod**, and **Drizzle ORM**.
+- **🎨 Modern Design System (`@repo/ui`):** Dark mode first, fluid glassmorphism interface powered by semantic tokens defined in `globals.css` with zero arbitrary hardcoded colors.
+
+---
+
+## 🏗️ Monorepo Architecture
+
+This project is organized as a high-performance monorepo powered by **Turborepo** and **pnpm**:
+
+---
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+
+- **Node.js:** `>= 22.0.0`
+- **pnpm:** `>= 11.0.0`
+- **PostgreSQL Database:** Supabase or local Postgres connection URI
+
+### 2. Clone & Install Dependencies
+
+```bash
+git clone https://github.com/sadid56/rove.git
+cd rove
+
+# Install all workspace dependencies
+pnpm install
 ```
 
-## What's inside?
+### 3. Environment Configuration
 
-This Turborepo includes the following packages/apps:
+Copy the example environment files and configure your credentials:
 
-### Apps and Packages
+```bash
+# API Environment
+cp apps/api/.env.example apps/api/.env
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+# Worker Environment
+cp apps/worker/.env.example apps/worker/.env
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+# Web Environment
+cp apps/web/.env.example apps/web/.env.local
 ```
 
-Without global `turbo`, use your package manager:
+Key environment variables to configure:
+- `DATABASE_URL`: Supabase / PostgreSQL connection pooler string
+- `BETTER_AUTH_SECRET`: Secret key for session encryption
+- `FASTIFY_PORT`: Port for API gateway (default: `4000`)
+- `NEXT_PUBLIC_API_URL`: Web client API endpoint (default: `http://localhost:4000`)
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
+### 4. Database Setup
+
+Push the Drizzle ORM schema to your database:
+
+```bash
+pnpm --filter @repo/database db:push
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### 5. Run Development Servers
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Start all applications (`web`, `api`, `worker`) concurrently:
 
-```sh
-turbo build --filter=docs
+```bash
+pnpm dev
 ```
 
-Without global `turbo`:
+The services will be available at:
+- **Web App / Dashboard:** `http://localhost:3000`
+- **API Gateway:** `http://localhost:4000`
+- **API Documentation:** `http://localhost:4000/docs`
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+---
+
+## 🛠️ Available Scripts
+
+Run these commands from the root directory:
+
+| Command | Description |
+| :--- | :--- |
+| `pnpm dev` | Starts all applications in concurrent watch mode |
+| `pnpm build` | Builds all apps and packages with Turborepo caching |
+| `pnpm check-types` | Verifies TypeScript types across all workspaces (`tsc --noEmit`) |
+| `pnpm lint` | Runs ESLint across all projects |
+| `pnpm format` | Formats code with Prettier |
+| `pnpm clean` | Completely cleans all build artifacts, caches, and `node_modules` across the monorepo |
+| `pnpm clean:cache` | Cleans `.next`, `.turbo`, `dist`, `build`, `.cache`, and `tsbuildinfo` (preserves `node_modules`) |
+
+### Targeting Specific Workspaces
+
+```bash
+# Run only web app
+pnpm --filter web dev
+
+# Run only API gateway
+pnpm --filter api dev
+
+# Run only Worker crawler
+pnpm --filter worker dev
+
+# Typecheck only web
+pnpm --filter web check-types
 ```
 
-### Develop
+---
 
-To develop all apps and packages, run the following command:
+## 🧹 Cache & Dependency Management
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+```bash
+# Full clean: removes all outputs, caches + node_modules for a completely fresh install
+pnpm clean
+pnpm install
 
-```sh
-cd my-turborepo
-turbo dev
+# Fast clean: removes only build outputs & caches without deleting node_modules
+pnpm clean:cache
 ```
 
-Without global `turbo`, use your package manager:
+---
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
+## 🛡️ Tech Stack
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | Next.js 15, React 19, TanStack Query, React Hook Form, Zod, Sonner |
+| **Styling** | Tailwind CSS v4, Semantic CSS Tokens (`@repo/ui/globals.css`) |
+| **API Framework** | Fastify 5, oRPC, `@fastify/cors`, `@fastify/helmet`, `@fastify/rate-limit` |
+| **Browser Engine** | Playwright (Headless Chromium), internal spider crawler, sitemap parser |
+| **Auth** | Better Auth (Email/Password, Session Tokens, Secure Cookies) |
+| **Database** | Supabase PostgreSQL, Drizzle ORM, Drizzle Kit |
+| **Monorepo Tools** | Turborepo, pnpm workspaces, TypeScript 7 |
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+---
 
-```sh
-turbo dev --filter=web
-```
+## 📄 License
 
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Private & Proprietary. All rights reserved by **Rove Platform**.

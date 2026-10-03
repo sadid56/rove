@@ -12,7 +12,7 @@ export function Table({ className, ...props }: ComponentProps<"table">) {
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead
-      className={cn("bg-secondary/60 text-muted-foreground font-mono text-xs uppercase border-b border-border", className)}
+      className={cn("bg-secondary/60 text-muted-foreground text-xs uppercase border-b border-border", className)}
       {...props}
     />
   );
@@ -44,7 +44,7 @@ export function TableHead({ className, ...props }: ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "px-4 py-3 text-left align-middle font-mono text-xs font-semibold uppercase text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        "px-4 py-3 text-left align-middle text-xs font-semibold uppercase text-muted-foreground [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}

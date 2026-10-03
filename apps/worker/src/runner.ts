@@ -12,9 +12,6 @@ import { addActiveJob, removeActiveJob, isScanCancelled, markScanCancelled } fro
 import { uploadScreenshot } from "./storage/r2";
 import { shouldSampleRoute, recordRouteSample } from "./crawler/pattern";
 
-/**
- * Strips null bytes (\0, 0x00) and invalid UTF-8 sequences that crash PostgreSQL.
- */
 function cleanText(val: string | undefined | null): string {
   if (!val) return "";
   return val.replace(/\0/g, "").replace(/\u0000/g, "");
@@ -116,7 +113,6 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
     let totalRuntimeErrors = 0;
 
     while (queue.length > 0 && visited.size < effectiveMaxPages) {
-      // Check if user requested to stop/cancel the scan
       if (isScanCancelled(scan.id)) {
         logger.worker(`Scan [${scan.id}] cancelled. Stopping crawler immediately.`);
         break;

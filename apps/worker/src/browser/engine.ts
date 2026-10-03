@@ -155,7 +155,6 @@ export class BrowserEngine {
 
       httpStatus = response?.status() ?? null;
 
-      // Gracefully wait up to 3.5s for dynamic client hydration and network settle
       await page.waitForLoadState("networkidle", { timeout: 3500 }).catch(() => {});
       html = await page.content();
 

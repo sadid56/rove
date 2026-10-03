@@ -81,16 +81,11 @@ export function normalizeUrl(rawUrl: string, baseUrl?: string): string | null {
   }
 }
 
-/**
- * Validates whether a URL is a legitimate web application HTML page route.
- * Excludes Next.js internal chunks (/_next/*), asset files (.js, .css, .xml), and API endpoints.
- */
 export function isValidPageRoute(urlString: string): boolean {
   try {
     const parsed = new URL(urlString);
     const pathname = parsed.pathname.toLowerCase();
 
-    // Ignore Next.js internals, framework chunks, static assets, and APIs
     if (
       pathname.startsWith("/_next") ||
       pathname.startsWith("/_nuxt") ||

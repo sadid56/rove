@@ -8,7 +8,6 @@ export interface PageHealthEvaluation {
   networkSummary: { total: number; failed: number; apiFailed: number; assetsFailed: number };
 }
 
-// Known telemetry, analytics, ad pixels, and tracker domains that should never fail a QA scan
 const TRACKER_DOMAINS = [
   "google-analytics.com",
   "analytics.google.com",
@@ -80,11 +79,9 @@ export function evaluatePageHealth(result: PageTestResult, targetUrl?: string): 
   const totalNetwork = result.networkRequests.length;
   const failedNetwork = result.networkRequests.filter((r) => r.failed);
 
-  // Filter out non-critical telemetry, trackers, and aborted beacon pings
   const nonTrackerFailed = failedNetwork.filter((r) => {
     if (isTrackerOrTelemetry(r.url)) return false;
     if (r.resourceType === "ping") return false;
-    // Aborted pings/analytics on navigation/close are expected browser behaviors
     if (r.failureReason?.includes("ERR_ABORTED") && (r.resourceType === "fetch" || r.resourceType === "xhr")) {
       return false;
     }

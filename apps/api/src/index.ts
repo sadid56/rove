@@ -5,7 +5,6 @@ import { logger } from "./lib/logger";
 async function start() {
   const app = await buildApp();
 
-  // Graceful shutdown
   const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
   for (const signal of signals) {
     process.on(signal, async () => {
@@ -27,11 +26,9 @@ async function start() {
       host: env.HOST,
     });
 
-    // Print aesthetic startup banner
     logger.banner({
       title: "ROVE QA ENGINE & WEB INTELLIGENCE",
       port: env.PORT,
-      docsPath: "/docs",
       environment: env.NODE_ENV,
     });
 

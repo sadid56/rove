@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 import * as schema from "./schema/index";
 
-// Load .env from the database package root (works regardless of which app imports this)
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 

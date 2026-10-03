@@ -86,7 +86,7 @@ class Logger {
   banner({
     title = "ROVE API ENGINE",
     port,
-    docsPath = "/docs",
+    docsPath,
     environment = "development",
   }: {
     title?: string;
@@ -95,9 +95,7 @@ class Logger {
     environment?: string;
   }) {
     const localUrl = `http://localhost:${port}`;
-    const docsUrl = `${localUrl}${docsPath}`;
 
-    const line = chalk.cyan("─".repeat(50));
     console.log();
     console.log(chalk.cyan("┌" + "─".repeat(50) + "┐"));
     console.log(
@@ -111,11 +109,14 @@ class Logger {
         `  ${chalk.gray("➜")}  ${chalk.bold("API Server:")}  ${chalk.cyanBright(localUrl)}`.padEnd(58) +
         chalk.cyan("│")
     );
-    console.log(
-      chalk.cyan("│") +
-        `  ${chalk.gray("➜")}  ${chalk.bold("OpenAPI/Docs:")} ${chalk.greenBright(docsUrl)}`.padEnd(58) +
-        chalk.cyan("│")
-    );
+    if (docsPath) {
+      const docsUrl = `${localUrl}${docsPath}`;
+      console.log(
+        chalk.cyan("│") +
+          `  ${chalk.gray("➜")}  ${chalk.bold("OpenAPI/Docs:")} ${chalk.greenBright(docsUrl)}`.padEnd(58) +
+          chalk.cyan("│")
+      );
+    }
     console.log(
       chalk.cyan("│") +
         `  ${chalk.gray("➜")}  ${chalk.bold("Environment:")}  ${chalk.yellow(environment)}`.padEnd(58) +

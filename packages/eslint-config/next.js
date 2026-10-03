@@ -12,7 +12,6 @@ import { config as baseConfig } from "./base.js";
 export const nextJsConfig = [
   ...baseConfig,
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",

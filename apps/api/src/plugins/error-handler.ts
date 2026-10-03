@@ -6,7 +6,6 @@ export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error: FastifyError, request, reply) => {
     request.log.error(error);
 
-    // Zod validation errors
     if (error instanceof ZodError) {
       return reply.status(400).send({
         success: false,
@@ -18,7 +17,6 @@ export function registerErrorHandler(app: FastifyInstance) {
       });
     }
 
-    // Fastify schema validation errors
     if (error.validation) {
       return reply.status(400).send({
         success: false,
