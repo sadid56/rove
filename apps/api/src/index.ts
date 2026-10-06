@@ -1,6 +1,7 @@
 import { buildApp } from "./app";
 import { env } from "./config/env";
-import { logger } from "./lib/logger";
+import { logger } from "@repo/config";
+
 
 async function start() {
   const app = await buildApp();

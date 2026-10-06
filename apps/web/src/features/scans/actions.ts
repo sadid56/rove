@@ -21,7 +21,7 @@ export async function cancelScan(scanId: string) {
   if (!scanId) throw new Error("Scan ID is required");
 
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/api/rpc/scans.updateStatus`, {
+  const res = await fetch(`${API_URL}/rpc/scans/update-status`, {
     method: "POST",
     headers,
     body: JSON.stringify({ id: scanId, status: "cancelled" }),

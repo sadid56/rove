@@ -24,13 +24,35 @@ export const scans = pgTable("scans", {
       maxPages?: number;
       captureScreenshots?: boolean;
       fullPageScreenshots?: boolean;
+      recordVideos?: boolean;
       maxConcurrency?: number;
     };
   }>(),
+  aiSummary: jsonb("ai_summary").$type<ScanAiSummary>(),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
+
+export interface ScanAiSummary {
+  overallHealthAssessment: string;
+  criticalIssuesCount: number;
+  topRiskAreas: string[];
+  recommendedActions: string[];
+  generatedAt: string;
+}
+
+export interface PageAiAnalysis {
+  status: "analyzed" | "clean" | "skipped";
+  severity: "critical" | "warning" | "info" | "clean";
+  rootCause: string;
+  summary: string;
+  impact: string;
+  suggestedFixes: string[];
+  codePatch?: string;
+  detectedCategories: string[];
+  analyzedAt: string;
+}
 
 export const scanRoutes = pgTable("scan_routes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -62,6 +84,8 @@ export const pageResults = pgTable("page_results", {
   ttfbMs: integer("ttfb_ms"),
   domContentLoadedMs: integer("dom_content_loaded_ms"),
   screenshotUrl: text("screenshot_url"),
+  videoUrl: text("video_url"),
+  aiAnalysis: jsonb("ai_analysis").$type<PageAiAnalysis>(),
   consoleSummary: jsonb("console_summary").$type<{
     logs: number;
     warnings: number;

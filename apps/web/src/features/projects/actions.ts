@@ -21,7 +21,7 @@ export async function deleteProject(projectId: string) {
   if (!projectId) throw new Error("Project ID is required");
 
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/api/rpc/projects.delete`, {
+  const res = await fetch(`${API_URL}/rpc/projects/delete`, {
     method: "POST",
     headers,
     body: JSON.stringify({ id: projectId }),
@@ -40,7 +40,7 @@ export async function createProject(data: { name: string; baseUrl: string }) {
   if (!data.name || !data.baseUrl) throw new Error("Name and baseUrl are required");
 
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/api/rpc/projects.create`, {
+  const res = await fetch(`${API_URL}/rpc/projects/create`, {
     method: "POST",
     headers,
     body: JSON.stringify(data),

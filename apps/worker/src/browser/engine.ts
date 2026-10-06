@@ -1,4 +1,9 @@
-import { chromium, type Browser, type BrowserContext } from "playwright";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import fs from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+import { BROWSER_USER_AGENT } from "@repo/config";
+
 
 export interface ConsoleCapturedEvent {
   type: "error" | "warn" | "info" | "log";
@@ -26,6 +31,13 @@ export interface NetworkCapturedRequest {
   failureReason?: string;
 }
 
+export interface PageTestOptions {
+  captureScreenshot?: boolean;
+  recordVideo?: boolean;
+  autoScroll?: boolean;
+  scrollDurationMs?: number;
+}
+
 export interface PageTestResult {
   url: string;
   httpStatus: number | null;
@@ -34,6 +46,7 @@ export interface PageTestResult {
   domContentLoadedMs?: number;
   screenshotBuffer?: Buffer;
   screenshotBase64?: string;
+  videoBuffer?: Buffer;
   html: string;
   consoleEvents: ConsoleCapturedEvent[];
   runtimeErrors: RuntimeCapturedError[];
@@ -59,13 +72,39 @@ export class BrowserEngine {
     }
   }
 
-  async testRoute(url: string, captureScreenshot = true): Promise<PageTestResult> {
+  async testRoute(
+    url: string,
+    optionsInput: boolean | PageTestOptions = true
+  ): Promise<PageTestResult> {
     await this.init();
+
+    const captureScreenshot =
+      typeof optionsInput === "boolean"
+        ? optionsInput
+        : optionsInput.captureScreenshot ?? true;
+    const shouldRecordVideo =
+      typeof optionsInput === "object" ? optionsInput.recordVideo ?? true : true;
+    const shouldAutoScroll =
+      typeof optionsInput === "object" ? optionsInput.autoScroll ?? true : true;
+    const scrollDurationMs =
+      typeof optionsInput === "object" ? optionsInput.scrollDurationMs ?? 2000 : 2000;
+
+    let tempVideoDir: string | undefined;
+    if (shouldRecordVideo) {
+      tempVideoDir = path.join(
+        os.tmpdir(),
+        `rove-vid-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      );
+      await fs.mkdir(tempVideoDir, { recursive: true }).catch(() => {});
+    }
 
     const context: BrowserContext = await this.browser!.newContext({
       viewport: { width: 1440, height: 900 },
+      recordVideo: tempVideoDir
+        ? { dir: tempVideoDir, size: { width: 1280, height: 720 } }
+        : undefined,
       userAgent:
-        process.env.BROWSER_USER_AGENT ||
+        BROWSER_USER_AGENT ||
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
       locale: "en-US",
       extraHTTPHeaders: {
@@ -161,6 +200,12 @@ export class BrowserEngine {
       if (captureScreenshot) {
         screenshotBuffer = await page.screenshot({ fullPage: false, type: "jpeg", quality: 75 }).catch(() => undefined);
       }
+
+      if (shouldRecordVideo && shouldAutoScroll) {
+        await this.performSmoothAutoScroll(page, scrollDurationMs);
+      } else if (shouldRecordVideo) {
+        await page.waitForTimeout(500).catch(() => {});
+      }
     } catch (err: any) {
       if (!httpStatus) {
         httpStatus = 504;
@@ -181,7 +226,24 @@ export class BrowserEngine {
 
     const loadTimeMs = Date.now() - startTime;
 
-    await context.close();
+    const pageVideo = page.video();
+    await page.close().catch(() => {});
+    await context.close().catch(() => {});
+
+    let videoBuffer: Buffer | undefined;
+    if (tempVideoDir && pageVideo) {
+      try {
+        const videoPath = await pageVideo.path().catch(() => null);
+        if (videoPath) {
+          videoBuffer = await fs.readFile(videoPath).catch(() => undefined);
+          await fs.unlink(videoPath).catch(() => {});
+        }
+      } catch {
+        // Cleanup error ignored
+      } finally {
+        await fs.rm(tempVideoDir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
 
     return {
       url,
@@ -189,9 +251,58 @@ export class BrowserEngine {
       loadTimeMs,
       html,
       screenshotBuffer,
+      videoBuffer,
       consoleEvents,
       runtimeErrors,
       networkRequests
     };
   }
+
+  private async performSmoothAutoScroll(page: Page, durationMs = 2000): Promise<void> {
+    try {
+      await page.evaluate(async (maxDuration: number) => {
+        await new Promise<void>((resolve) => {
+          const totalHeight = Math.max(
+            document.body.scrollHeight || 0,
+            document.documentElement.scrollHeight || 0,
+            document.body.offsetHeight || 0
+          );
+          const viewportHeight = window.innerHeight || 900;
+
+          // If the page is not scrollable, pause briefly and finish
+          if (totalHeight <= viewportHeight + 60) {
+            setTimeout(resolve, 800);
+            return;
+          }
+
+          const maxScroll = Math.min(totalHeight - viewportHeight, 3500);
+          const startTime = performance.now();
+          const scrollDownDuration = Math.max(800, maxDuration * 0.7);
+
+          function step(now: number) {
+            const elapsed = now - startTime;
+            if (elapsed < scrollDownDuration) {
+              const progress = elapsed / scrollDownDuration;
+              // Smooth quadratic ease-in-out curve
+              const ease =
+                progress < 0.5
+                  ? 2 * progress * progress
+                  : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+              window.scrollTo(0, ease * maxScroll);
+              requestAnimationFrame(step);
+            } else {
+              // Smoothly glide back to the top
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              setTimeout(resolve, 400);
+            }
+          }
+
+          requestAnimationFrame(step);
+        });
+      }, durationMs);
+    } catch {
+      // In case evaluate is interrupted or page closed
+    }
+  }
 }
+

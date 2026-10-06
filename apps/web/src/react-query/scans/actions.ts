@@ -3,6 +3,26 @@ import { useAppMutation } from "@/hooks/useAppMutation";
 import { client } from "@/lib/orpc";
 import { scansKeys } from "./keys";
 
+export interface PageAiAnalysis {
+  status: "analyzed" | "clean" | "skipped";
+  severity: "critical" | "warning" | "info" | "clean";
+  rootCause: string;
+  summary: string;
+  impact: string;
+  suggestedFixes: string[];
+  codePatch?: string;
+  detectedCategories: string[];
+  analyzedAt: string;
+}
+
+export interface ScanAiSummary {
+  overallHealthAssessment: string;
+  criticalIssuesCount: number;
+  topRiskAreas: string[];
+  recommendedActions: string[];
+  generatedAt: string;
+}
+
 export interface ScanRoute {
   id: string;
   scanId: string;
@@ -14,6 +34,8 @@ export interface ScanRoute {
   renderingType: "static" | "isr" | "ssr" | "client-dynamic" | "unknown";
   loadTimeMs: number | null;
   screenshotUrl?: string;
+  videoUrl?: string;
+  aiAnalysis?: PageAiAnalysis;
   consoleSummary?: { logs: number; warnings: number; errors: number };
   networkSummary?: { total: number; failed: number; apiFailed: number; assetsFailed: number };
 }
@@ -40,6 +62,7 @@ export interface ScanDetail {
   healthyRoutes: number;
   warningRoutes: number;
   failedRoutes: number;
+  aiSummary?: ScanAiSummary;
   summary?: {
     consoleErrors?: number;
     failedRequests?: number;
@@ -99,16 +122,22 @@ export function useScans(params?: { projectId?: string; page?: number; pageSize?
   });
 }
 
-export function useScanRoutes(params: {
-  id: string;
-  healthStatus?: "all" | "healthy" | "warning" | "failed";
-  page?: number;
-  pageSize?: number;
-}) {
+export function useScanRoutes(
+  params: {
+    id: string;
+    healthStatus?: "all" | "healthy" | "warning" | "failed";
+    page?: number;
+    pageSize?: number;
+  },
+  options?: {
+    refetchInterval?: number | false | ((query: any) => number | false);
+  },
+) {
   return useQuery({
     queryKey: scansKeys.routes(params.id, params),
-    queryFn: () => (client.scans as any).listRoutes(params) as Promise<PaginatedResult<ScanRoute>>,
+    queryFn: () => client.scans.listRoutes(params) as unknown as Promise<PaginatedResult<ScanRoute>>,
     enabled: Boolean(params.id),
+    refetchInterval: options?.refetchInterval,
   });
 }
 
@@ -130,7 +159,7 @@ export function useScan(id: string) {
 export function usePageDetail(pageId: string) {
   return useQuery({
     queryKey: scansKeys.page(pageId),
-    queryFn: () => client.scans.getPageDetail({ pageId }) as Promise<PageDetailInspection>,
+    queryFn: () => client.scans.pageDetails({ pageId }) as Promise<PageDetailInspection>,
     enabled: Boolean(pageId)
   });
 }
@@ -152,3 +181,14 @@ export function useCancelScan() {
     errorMessage: "Failed to stop scan"
   });
 }
+
+export function useAnalyzePageAi() {
+  return useAppMutation<{ pageId: string }>({
+    mutationFn: (data) => client.scans.analyzePageAi({ pageId: data.pageId }),
+    invalidateKeys: [["scans"]],
+    successMessage: "AI Diagnostic Analysis completed",
+    errorMessage: "Failed to analyze page with AI",
+  });
+}
+
+

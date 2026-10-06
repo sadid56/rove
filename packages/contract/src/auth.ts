@@ -99,14 +99,14 @@ export const userContract = {
       summary: "List all users",
     })
     .input(listUsersQuerySchema),
-  getUser: oc
+  get: oc
     .route({
       method: "GET",
       path: "/users/{id}",
       summary: "Get user by ID",
     })
     .input(userIdParamSchema),
-  getMe: oc.route({
+  me: oc.route({
     method: "GET",
     path: "/users/me",
     summary: "Get current logged-in user profile",
@@ -122,3 +122,4 @@ export const userContract = {
   updateRole: oc.input(updateRoleSchema),
   delete: oc.input(userIdParamSchema),
 };
+

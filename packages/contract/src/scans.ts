@@ -83,11 +83,18 @@ export const scanContract = {
       summary: "List paginated routes of a scan with optional health filter",
     })
     .input(listScanRoutesQuerySchema),
-  getPageDetail: oc
+  pageDetails: oc
     .route({
       method: "GET",
       path: "/scans/page/{pageId}",
       summary: "Get detailed inspection of a specific tested page",
+    })
+    .input(pageIdParamSchema),
+  analyzePageAi: oc
+    .route({
+      method: "POST",
+      path: "/scans/page/{pageId}/ai-analyze",
+      summary: "Run AI diagnostic analysis and fix generator for a tested page",
     })
     .input(pageIdParamSchema),
   create: oc
@@ -105,3 +112,5 @@ export const scanContract = {
     })
     .input(updateScanStatusSchema),
 };
+
+

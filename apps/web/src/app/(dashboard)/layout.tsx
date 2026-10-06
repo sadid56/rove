@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Automated Production QA & Web Intelligence Platform",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return <DashboardShell>{children}</DashboardShell>;
 }

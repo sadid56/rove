@@ -1,15 +1,8 @@
-import { db, QueryBuilder } from "@repo/database";
-import {
-  scans,
-  scanRoutes,
-  pageResults,
-  consoleEvents,
-  runtimeErrors,
-  networkRequests,
-  regressions
-} from "@repo/database/schema";
+import { db, generatePageAiDiagnosis, QueryBuilder } from "@repo/database";
+import { scans, scanRoutes, pageResults, consoleEvents, runtimeErrors, networkRequests, regressions } from "@repo/database/schema";
 import { eq, desc } from "drizzle-orm";
 import type { CreateScanInput } from "@repo/contract";
+import { WORKER_URL } from "@repo/config";
 
 export class ScansService {
   async create(input: CreateScanInput) {
@@ -25,8 +18,8 @@ export class ScansService {
           brokenAssets: 0,
           runtimeErrors: 0,
           renderingDistribution: {},
-          options: input.options
-        }
+          options: input.options,
+        },
       })
       .returning();
 
@@ -50,9 +43,7 @@ export class ScansService {
     pageSize?: number;
   }) {
     const healthFilter =
-      query.healthStatus && query.healthStatus !== "all"
-        ? (query.healthStatus as "healthy" | "warning" | "failed")
-        : undefined;
+      query.healthStatus && query.healthStatus !== "all" ? (query.healthStatus as "healthy" | "warning" | "failed") : undefined;
 
     return QueryBuilder.from(db, pageResults)
       .where(eq(pageResults.scanId, query.id as any))
@@ -82,7 +73,7 @@ export class ScansService {
     return {
       ...scan,
       routes,
-      regressions: scanRegressions
+      regressions: scanRegressions,
     };
   }
 
@@ -109,31 +100,53 @@ export class ScansService {
       ...page,
       consoleEvents: cEvents,
       runtimeErrors: rErrors,
-      networkRequests: nRequests
+      networkRequests: nRequests,
     };
   }
 
-  async updateStatus(
-    id: string,
-    status: "queued" | "discovering" | "scanning" | "analyzing" | "completed" | "failed" | "cancelled"
-  ) {
+  async analyzePageWithAi(pageId: string) {
+    const pageDetail = await this.getPageDetail(pageId);
+    if (!pageDetail) return null;
+
+    const diagnosis = await generatePageAiDiagnosis({
+      routePath: pageDetail.path,
+      url: pageDetail.url,
+      httpStatus: pageDetail.httpStatus,
+      healthStatus: pageDetail.healthStatus as any,
+      healthReasons: pageDetail.healthReasons || [],
+      renderingType: pageDetail.renderingType,
+      consoleEvents: pageDetail.consoleEvents,
+      runtimeErrors: pageDetail.runtimeErrors,
+      networkRequests: pageDetail.networkRequests,
+    });
+
+    await db
+      .update(pageResults)
+      .set({ aiAnalysis: diagnosis })
+      .where(eq(pageResults.id, pageId as any));
+
+    return {
+      ...pageDetail,
+      aiAnalysis: diagnosis,
+    };
+  }
+
+  async updateStatus(id: string, status: "queued" | "discovering" | "scanning" | "analyzing" | "completed" | "failed" | "cancelled") {
     const [updated] = await db
       .update(scans)
       .set({
         status,
-        ...(status === "completed" || status === "failed" || status === "cancelled"
-          ? { completedAt: new Date() }
-          : {})
+        ...(status === "completed" || status === "failed" || status === "cancelled" ? { completedAt: new Date() } : {}),
       })
       .where(eq(scans.id, id as any))
       .returning();
 
     if (status === "cancelled") {
-      const workerUrl = process.env.WORKER_URL || "http://localhost:4001";
+      const workerUrl = WORKER_URL || "http://localhost:4001";
       fetch(`${workerUrl}/jobs/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scanId: id })
+        body: JSON.stringify({ scanId: id }),
       }).catch(() => {});
     }
 

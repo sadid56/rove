@@ -1,14 +1,13 @@
-import "dotenv/config";
+import { WORKER_PORT, WORKER_HOST, MAX_CONCURRENT_SCANS, NODE_ENV } from "@repo/config";
 import { db } from "@repo/database";
 import { scans } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { runScan } from "./runner";
-import { logger } from "./utils/logger";
+import { logger } from "@repo/config";
 import { createWorkerServer } from "./server";
 
-const WORKER_PORT = Number(process.env.WORKER_PORT || 4001);
-const WORKER_HOST = process.env.WORKER_HOST || "0.0.0.0";
-const MAX_CONCURRENT_SCANS = Number(process.env.MAX_CONCURRENT_SCANS || 3);
+
+
 
 const runningScans = new Set<string>();
 
@@ -56,13 +55,15 @@ export async function startWorkerServer(): Promise<void> {
 
   try {
     await app.listen({ port: WORKER_PORT, host: WORKER_HOST });
-    logger.worker(`Worker HTTP Server listening at http://localhost:${WORKER_PORT}`);
-    logger.worker(`  ├── Concurrency:  ${MAX_CONCURRENT_SCANS} simultaneous scan jobs`);
-    logger.worker(`  ├── Health:       http://localhost:${WORKER_PORT}/health`);
-    logger.worker(`  ├── Status:       http://localhost:${WORKER_PORT}/status`);
-    logger.worker(`  ├── Recent Logs:  http://localhost:${WORKER_PORT}/logs`);
-    logger.worker(`  └── Live Stream:  http://localhost:${WORKER_PORT}/logs/stream (SSE)`);
+    logger.banner({
+      title: "ROVE QA WORKER & BROWSER ENGINE",
+      port: WORKER_PORT,
+      concurrency: MAX_CONCURRENT_SCANS,
+      environment: NODE_ENV,
+    });
+    logger.success(`Worker HTTP server listening on http://${WORKER_HOST}:${WORKER_PORT}`);
   } catch (err) {
+
     logger.error(`Failed to bind worker HTTP server on port ${WORKER_PORT}:`, err);
   }
 
@@ -79,11 +80,11 @@ export async function startWorkerServer(): Promise<void> {
   loop();
 }
 
-if (process.env.NODE_ENV !== "test") {
+if (NODE_ENV !== "test") {
   startWorkerServer();
 }
 
 export * from "./runner";
 export * from "./server";
-export * from "./utils/logger";
 export * from "./storage/r2";
+

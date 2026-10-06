@@ -13,14 +13,14 @@ export function useUsers({ search = "" }) {
 export function useUser(id: string) {
   return useQuery({
     queryKey: usersKeys.detail(id),
-    queryFn: () => client.user.getUser({ id })
+    queryFn: () => client.user.get({ id })
   });
 }
 
 export function useGetMe(initialData?: any) {
   return useQuery({
     queryKey: ["users", "me"],
-    queryFn: () => client.user.getMe(),
+    queryFn: () => client.user.me(),
     initialData
   });
 }
@@ -60,3 +60,4 @@ export function useUpdateProfile() {
     errorMessage: "Failed to update profile"
   });
 }
+

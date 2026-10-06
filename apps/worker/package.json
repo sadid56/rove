@@ -13,7 +13,11 @@
     "@aws-sdk/client-s3": "^3.1144.0",
     "@fastify/cors": "^10.0.2",
     "@repo/database": "workspace:*",
+    "@repo/config": "workspace:*",
+    "chalk": "^5.4.1",
     "dotenv": "^16.4.7",
+
+
     "drizzle-orm": "^0.38.4",
     "fastify": "^5.2.1",
     "playwright": "^1.50.1"

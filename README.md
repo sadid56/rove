@@ -51,24 +51,22 @@ pnpm install
 
 ### 3. Environment Configuration
 
-Copy the example environment files and configure your credentials:
+Copy the unified root environment template and configure your credentials:
 
 ```bash
-# API Environment
-cp apps/api/.env.example apps/api/.env
-
-# Worker Environment
-cp apps/worker/.env.example apps/worker/.env
-
-# Web Environment
-cp apps/web/.env.example apps/web/.env.local
+# Copy root environment template
+cp .env.example .env
 ```
+
+All workspaces (`api`, `worker`, `web`, `@repo/database`) automatically inherit and read from this single root `.env` file.
 
 Key environment variables to configure:
 - `DATABASE_URL`: Supabase / PostgreSQL connection pooler string
 - `BETTER_AUTH_SECRET`: Secret key for session encryption
-- `FASTIFY_PORT`: Port for API gateway (default: `4000`)
-- `NEXT_PUBLIC_API_URL`: Web client API endpoint (default: `http://localhost:4000`)
+- `GEMINI_API_KEY`: Google Gemini API key for automated AI QA diagnostics
+- `GEMINI_MODEL`: Gemini model name (default: `gemini-2.5-flash-lite`)
+- `API_URL`: Fastify API gateway endpoint (default: `http://localhost:4000`)
+
 
 ### 4. Database Setup
 

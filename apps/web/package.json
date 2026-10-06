@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
-    "@next/swc-linux-x64-gnu": "16.3.8",
     "@orpc/client": "^1.15.4",
     "@orpc/tanstack-query": "^1.15.4",
+    "@repo/config": "workspace:*",
     "@repo/contract": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-query": "^5.66.11",

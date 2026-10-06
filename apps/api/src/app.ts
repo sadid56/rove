@@ -17,10 +17,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     bodyLimit: env.BODY_LIMIT_BYTES,
     requestIdHeader: "x-request-id",
     requestIdLogLabel: "reqId",
-    logger: buildPinoLoggerOptions(),
+    logger: false,
     connectionTimeout: 30_000,
     keepAliveTimeout: 72_000,
   });
+
 
   registerRequestLogger(app);
 

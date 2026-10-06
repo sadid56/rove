@@ -1,66 +1,66 @@
-import { implement, ORPCError } from "@orpc/server";
+import { ORPCError } from "@orpc/server";
 import { scanContract } from "@repo/contract";
 import { scansService } from "./scans.service";
+import { createProcedure } from "../../utils/procedure";
 
-export const listScans = implement(scanContract.list).handler(
-  async ({ input }) => {
-    return await scansService.list(input);
-  }
+export const listScans = createProcedure(scanContract.list, (input) =>
+  scansService.list(input)
 );
 
-export const getScan = implement(scanContract.get).handler(
-  async ({ input }) => {
-    const scan = await scansService.findById(input.id);
-    if (!scan) {
-      throw new ORPCError("NOT_FOUND", {
-        message: `Scan with ID ${input.id} was not found`
-      });
-    }
-    return scan;
+export const getScan = createProcedure(scanContract.get, async ({ id }) => {
+  const scan = await scansService.findById(id);
+  if (!scan) {
+    throw new ORPCError("NOT_FOUND", {
+      message: `Scan with ID ${id} was not found`
+    });
   }
+  return scan;
+});
+
+export const listScanRoutes = createProcedure(scanContract.listRoutes, (input) =>
+  scansService.listRoutes(input)
 );
 
-export const listScanRoutes = implement(scanContract.listRoutes).handler(
-  async ({ input }) => {
-    return await scansService.listRoutes(input);
+export const getPageDetail = createProcedure(scanContract.pageDetails, async ({ pageId }) => {
+  const page = await scansService.getPageDetail(pageId);
+  if (!page) {
+    throw new ORPCError("NOT_FOUND", {
+      message: `Page result with ID ${pageId} was not found`
+    });
   }
+  return page;
+});
+
+export const analyzePageAi = createProcedure(scanContract.analyzePageAi, async ({ pageId }) => {
+  const diagnosed = await scansService.analyzePageWithAi(pageId);
+  if (!diagnosed) {
+    throw new ORPCError("NOT_FOUND", {
+      message: `Page result with ID ${pageId} was not found`
+    });
+  }
+  return diagnosed;
+});
+
+export const createScan = createProcedure(scanContract.create, (input) =>
+  scansService.create(input)
 );
 
-export const getPageDetail = implement(scanContract.getPageDetail).handler(
-  async ({ input }) => {
-    const page = await scansService.getPageDetail(input.pageId);
-    if (!page) {
-      throw new ORPCError("NOT_FOUND", {
-        message: `Page result with ID ${input.pageId} was not found`
-      });
-    }
-    return page;
+export const updateScanStatus = createProcedure(scanContract.updateStatus, async ({ id, status }) => {
+  const updated = await scansService.updateStatus(id, status);
+  if (!updated) {
+    throw new ORPCError("NOT_FOUND", {
+      message: `Scan with ID ${id} was not found`
+    });
   }
-);
-
-export const createScan = implement(scanContract.create).handler(
-  async ({ input }) => {
-    return await scansService.create(input);
-  }
-);
-
-export const updateScanStatus = implement(scanContract.updateStatus).handler(
-  async ({ input }) => {
-    const updated = await scansService.updateStatus(input.id, input.status);
-    if (!updated) {
-      throw new ORPCError("NOT_FOUND", {
-        message: `Scan with ID ${input.id} was not found`
-      });
-    }
-    return updated;
-  }
-);
+  return updated;
+});
 
 export const scanRouter = {
   list: listScans,
   get: getScan,
   listRoutes: listScanRoutes,
-  getPageDetail,
+  pageDetails: getPageDetail,
+  analyzePageAi,
   create: createScan,
-  updateStatus: updateScanStatus
+  updateStatus: updateScanStatus,
 };

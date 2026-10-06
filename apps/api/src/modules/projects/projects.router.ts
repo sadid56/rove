@@ -1,40 +1,35 @@
-import { implement, ORPCError } from "@orpc/server";
+import { ORPCError } from "@orpc/server";
 import { projectContract } from "@repo/contract";
 import { projectsService } from "./projects.service";
+import { createProcedure } from "../../utils/procedure";
 
-export const listProjects = implement(projectContract.list).handler(async () => {
-  return await projectsService.list();
+export const listProjects = createProcedure(projectContract.list, () =>
+  projectsService.list()
+);
+
+export const getProject = createProcedure(projectContract.get, async ({ id }) => {
+  const project = await projectsService.findById(id);
+  if (!project) {
+    throw new ORPCError("NOT_FOUND", {
+      message: `Project with ID ${id} was not found`
+    });
+  }
+  return project;
 });
 
-export const getProject = implement(projectContract.get).handler(
-  async ({ input }) => {
-    const project = await projectsService.findById(input.id);
-    if (!project) {
-      throw new ORPCError("NOT_FOUND", {
-        message: `Project with ID ${input.id} was not found`
-      });
-    }
-    return project;
-  }
+export const createProject = createProcedure(projectContract.create, (input) =>
+  projectsService.create(input)
 );
 
-export const createProject = implement(projectContract.create).handler(
-  async ({ input }) => {
-    return await projectsService.create(input);
+export const deleteProject = createProcedure(projectContract.delete, async ({ id }) => {
+  const success = await projectsService.delete(id);
+  if (!success) {
+    throw new ORPCError("NOT_FOUND", {
+      message: `Project with ID ${id} was not found`
+    });
   }
-);
-
-export const deleteProject = implement(projectContract.delete).handler(
-  async ({ input }) => {
-    const success = await projectsService.delete(input.id);
-    if (!success) {
-      throw new ORPCError("NOT_FOUND", {
-        message: `Project with ID ${input.id} was not found`
-      });
-    }
-    return { success: true };
-  }
-);
+  return { success: true };
+});
 
 export const projectRouter = {
   list: listProjects,

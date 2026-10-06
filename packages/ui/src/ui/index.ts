@@ -11,3 +11,4 @@ export * from "./tabs";
 export * from "./logo";
 export * from "./data-table";
 export * from "./breadcrumb";
+export * from "./code-block";

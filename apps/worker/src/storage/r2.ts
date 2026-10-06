@@ -2,13 +2,16 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
-import { logger } from "../utils/logger";
+import { logger } from "@repo/config";
 
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
-const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || process.env.NEXT_PUBLIC_CDN_URL || "").replace(/\/+$/, "");
+import {
+  R2_ACCOUNT_ID,
+  R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY,
+  R2_BUCKET_NAME,
+  R2_PUBLIC_URL
+} from "@repo/config";
+
 
 const isR2Configured = Boolean(
   R2_ACCOUNT_ID &&
@@ -80,6 +83,56 @@ export async function uploadScreenshot(options: UploadScreenshotOptions): Promis
 
   return relativeKey;
 }
+
+export interface UploadVideoOptions {
+  buffer: Buffer;
+  scanId: string;
+  routePath: string;
+}
+
+export async function uploadVideo(options: UploadVideoOptions): Promise<string> {
+  const { buffer, scanId, routePath } = options;
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const cleanScanId = scanId.slice(0, 8);
+  const hash = crypto.createHash("md5").update(routePath + buffer.length).digest("hex").slice(0, 8);
+  const safePathSlug = routePath.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 30) || "index";
+
+  const relativeKey = `/videos/${dateStr}/${cleanScanId}/${safePathSlug}-${hash}.webm`;
+  const s3Key = relativeKey.replace(/^\/+/, "");
+
+  if (s3Client && R2_BUCKET_NAME) {
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: s3Key,
+          Body: buffer,
+          ContentType: "video/webm",
+          CacheControl: "public, max-age=31536000, immutable"
+        })
+      );
+      logger.info(`Uploaded video to Cloudflare R2: ${relativeKey}`);
+      return relativeKey;
+    } catch (err) {
+      logger.error(`Cloudflare R2 video upload failed for ${relativeKey}, falling back to local:`, err);
+    }
+  }
+
+  try {
+    const localDir = path.resolve(process.cwd(), "public", "videos", dateStr, cleanScanId);
+    await fs.mkdir(localDir, { recursive: true });
+    const localFilePath = path.join(localDir, `${safePathSlug}-${hash}.webm`);
+    await fs.writeFile(localFilePath, buffer);
+    logger.info(`Saved video locally: ${relativeKey}`);
+  } catch (err) {
+    logger.error("Failed to write video to local storage:", err);
+  }
+
+  return relativeKey;
+}
+
 
 export function getStoragePublicUrl(relativeKey: string): string {
   if (!relativeKey) return "";

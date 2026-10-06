@@ -24,9 +24,10 @@ export function buildPinoLoggerOptions(): FastifyServerOptions["logger"] {
           options: {
             colorize: true,
             translateTime: "HH:MM:ss.l",
-            ignore: "pid,hostname",
+            ignore: "pid,hostname,reqId",
             singleLine: true,
           },
+
         }
       : undefined,
   };

@@ -21,6 +21,12 @@ export interface BreadcrumbLinkProps extends ComponentProps<"a"> {
 }
 
 export function BreadcrumbLink({ className, asChild = false, children, ...props }: BreadcrumbLinkProps) {
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children as React.ReactElement<{ className?: string }>, {
+      className: cn("transition-colors hover:text-foreground font-medium cursor-pointer", className, (children.props as any).className),
+      ...props,
+    });
+  }
   return (
     <a className={cn("transition-colors hover:text-foreground font-medium cursor-pointer", className)} {...props}>
       {children}

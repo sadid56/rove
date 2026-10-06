@@ -1,4 +1,4 @@
-import { db } from "@repo/database";
+import { db, generatePageAiDiagnosis, generateScanAiSummary, type PageAiAnalysis } from "@repo/database";
 import { scans, projects, scanRoutes, pageResults, consoleEvents, runtimeErrors, networkRequests } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
 import { normalizeUrl, getPathname } from "./crawler/normalizer";
@@ -7,10 +7,14 @@ import { extractInternalLinks } from "./crawler/spider";
 import { BrowserEngine } from "./browser/engine";
 import { evaluatePageHealth } from "./analyzers/health";
 import { detectRegressions } from "./analyzers/regression";
-import { logger } from "./utils/logger";
+import { logger } from "@repo/config";
+
 import { addActiveJob, removeActiveJob, isScanCancelled, markScanCancelled } from "./server";
-import { uploadScreenshot } from "./storage/r2";
+import { uploadScreenshot, uploadVideo } from "./storage/r2";
 import { shouldSampleRoute, recordRouteSample } from "./crawler/pattern";
+import { DEFAULT_MAX_PAGES } from "@repo/config";
+
+
 
 function cleanText(val: string | undefined | null): string {
   if (!val) return "";
@@ -30,7 +34,7 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
     .where(eq(scans.id, scanId as any));
   if (!scan) return;
 
-  let effectiveMaxPages = customMaxPages || Number(process.env.DEFAULT_MAX_PAGES || 100);
+  let effectiveMaxPages = customMaxPages || DEFAULT_MAX_PAGES || 100;
 
   if (scan.projectId) {
     const [project] = await db.select().from(projects).where(eq(projects.id, scan.projectId));
@@ -111,6 +115,13 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
     let totalFailedRequests = 0;
     let totalBrokenAssets = 0;
     let totalRuntimeErrors = 0;
+    const failedPagesWithAi: Array<{
+      path: string;
+      aiAnalysis?: PageAiAnalysis | null;
+      healthReasons?: string[];
+    }> = [];
+
+    const shouldRecordVideos = scan.summary?.options?.recordVideos !== false;
 
     while (queue.length > 0 && visited.size < effectiveMaxPages) {
       if (isScanCancelled(scan.id)) {
@@ -134,7 +145,11 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
 
       logger.test(visited.size, effectiveMaxPages, currentUrl);
 
-      const testResult = await engine.testRoute(currentUrl, true);
+      const testResult = await engine.testRoute(currentUrl, {
+        captureScreenshot: true,
+        recordVideo: shouldRecordVideos,
+        autoScroll: shouldRecordVideos,
+      });
       const health = evaluatePageHealth(testResult, scan.targetUrl);
 
       if (health.healthStatus === "healthy") {
@@ -163,6 +178,41 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
         });
       }
 
+      let videoKey: string | undefined;
+      if (testResult.videoBuffer) {
+        videoKey = await uploadVideo({
+          buffer: testResult.videoBuffer,
+          scanId: scan.id,
+          routePath: getPathname(currentUrl),
+        });
+      }
+
+      let pageAiDiagnosis: PageAiAnalysis | undefined;
+      if (
+        health.healthStatus !== "healthy" ||
+        testResult.runtimeErrors.length > 0 ||
+        health.consoleSummary.errors > 0 ||
+        health.networkSummary.failed > 0
+      ) {
+        pageAiDiagnosis = await generatePageAiDiagnosis({
+          routePath: getPathname(currentUrl),
+          url: currentUrl,
+          httpStatus: testResult.httpStatus,
+          healthStatus: health.healthStatus,
+          healthReasons: health.healthReasons,
+          renderingType: health.renderingType,
+          consoleEvents: testResult.consoleEvents,
+          runtimeErrors: testResult.runtimeErrors,
+          networkRequests: testResult.networkRequests,
+        });
+
+        failedPagesWithAi.push({
+          path: getPathname(currentUrl),
+          aiAnalysis: pageAiDiagnosis,
+          healthReasons: health.healthReasons,
+        });
+      }
+
       const [savedPageResult] = await db
         .insert(pageResults)
         .values({
@@ -175,10 +225,13 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
           renderingType: health.renderingType,
           loadTimeMs: testResult.loadTimeMs,
           screenshotUrl: screenshotKey,
+          videoUrl: videoKey,
+          aiAnalysis: pageAiDiagnosis,
           consoleSummary: health.consoleSummary,
           networkSummary: health.networkSummary,
         })
         .returning();
+
 
       if (savedPageResult) {
         if (testResult.consoleEvents.length > 0) {
@@ -278,12 +331,22 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
     const healthScore = totalTested > 0 ? Math.round((healthyCount / totalTested) * 100) : 100;
     const durationSec = (Date.now() - startTime) / 1000;
 
+    const scanAiSummary = generateScanAiSummary({
+      targetUrl: scan.targetUrl,
+      totalRoutes: totalTested,
+      healthyRoutes: healthyCount,
+      warningRoutes: warningCount,
+      failedRoutes: failedCount,
+      failedPages: failedPagesWithAi,
+    });
+
     await db
       .update(scans)
       .set({
         status: "completed",
         completedAt: new Date(),
         healthScore,
+        aiSummary: scanAiSummary,
         summary: {
           ...(scan.summary || {}),
           consoleErrors: totalConsoleErrors,
@@ -293,6 +356,7 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
         },
       })
       .where(eq(scans.id, scanId as any));
+
 
     logger.complete(scan.targetUrl, {
       score: healthScore,

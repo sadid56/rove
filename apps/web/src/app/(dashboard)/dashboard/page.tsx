@@ -7,6 +7,8 @@ export const metadata: Metadata = {
     "Automated production web application intelligence & automated QA monitoring",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardOverviewPage() {
   return <DashboardOverview />;
 }

@@ -212,7 +212,7 @@ export async function forgotPassword(input: ForgotPasswordInput): Promise<AuthAc
 
   try {
     const origin = await getClientOrigin();
-    const res = await fetch(`${API_URL}/api/rpc/auth.forgotPassword`, {
+    const res = await fetch(`${API_URL}/rpc/auth/forgot-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -254,7 +254,7 @@ export async function resetPassword(input: ResetPasswordInput): Promise<AuthActi
 
   try {
     const origin = await getClientOrigin();
-    const res = await fetch(`${API_URL}/api/rpc/auth.resetPassword`, {
+    const res = await fetch(`${API_URL}/rpc/auth/reset-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

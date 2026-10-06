@@ -1,10 +1,13 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { env } from "../config/env";
+import { logger } from "@repo/config";
+
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    request.log.error(error);
+    logger.error(`${request.method} ${request.url} failed`, error);
+
 
     if (error instanceof ZodError) {
       return reply.status(400).send({

@@ -15,10 +15,12 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@repo/config": "workspace:*",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.4",
     "postgres": "^3.4.5"
   },
+
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/node": "26.4.1",

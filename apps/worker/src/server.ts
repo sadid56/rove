@@ -1,10 +1,13 @@
 import fastify from "fastify";
 import cors from "@fastify/cors";
-import { recentLogs, logEmitter, logger, type LogEntry } from "./utils/logger";
+import { recentLogs, logEmitter, logger, type LogEntry } from "@repo/config";
+
 import { runScan } from "./runner";
 import { db } from "@repo/database";
 import { scans } from "@repo/database/schema";
 import { eq } from "drizzle-orm";
+import { WORKER_PORT, MAX_CONCURRENT_SCANS } from "@repo/config";
+
 
 export interface ActiveJob {
   scanId: string;
@@ -46,14 +49,21 @@ export async function createWorkerServer() {
     credentials: true
   });
 
+  app.addHook("onResponse", async (request, reply) => {
+    const ms = Math.round(reply.elapsedTime);
+    logger.http(request.method, request.url, reply.statusCode, ms);
+  });
+
+
   app.get("/", async () => {
     const jobs = getActiveJobs();
     return {
       service: "rove-worker",
       status: "operational",
-      port: Number(process.env.WORKER_PORT || 4001),
-      maxConcurrentScans: Number(process.env.MAX_CONCURRENT_SCANS || 3),
+      port: WORKER_PORT,
+      maxConcurrentScans: MAX_CONCURRENT_SCANS,
       activeJobsCount: jobs.length,
+
       activeJobs: jobs,
       uptimeSec: Math.floor(process.uptime())
     };

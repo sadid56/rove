@@ -1,21 +1,27 @@
 import type { NextConfig } from "next";
-
-const API_SERVER_URL = process.env.API_URL || "http://localhost:4000";
+import { API_URL, NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_CDN_URL, NEXT_PUBLIC_R2_PUBLIC_URL } from "@repo/config";
 
 const nextConfig: NextConfig = {
+  env: {
+    API_URL,
+    NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_CDN_URL,
+    NEXT_PUBLIC_R2_PUBLIC_URL,
+  },
+
   async rewrites() {
     return [
       {
         source: "/rpc/:path*",
-        destination: `${API_SERVER_URL}/rpc/:path*`,
+        destination: `${API_URL}/rpc/:path*`,
       },
       {
         source: "/rpc",
-        destination: `${API_SERVER_URL}/rpc`,
+        destination: `${API_URL}/rpc`,
       },
       {
         source: "/api/v1/:path*",
-        destination: `${API_SERVER_URL}/api/v1/:path*`,
+        destination: `${API_URL}/api/v1/:path*`,
       },
     ];
   },

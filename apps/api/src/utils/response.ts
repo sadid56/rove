@@ -1,4 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { logger } from "@repo/config";
+
+
 
 export interface ApiResponseOptions<T = unknown> {
   statusCode?: number;
@@ -56,6 +59,7 @@ export function sendError(
   });
 }
 
+
 export function catchAsync<Req extends FastifyRequest = FastifyRequest>(
   fn: (request: Req, reply: FastifyReply) => Promise<unknown>
 ) {
@@ -63,7 +67,7 @@ export function catchAsync<Req extends FastifyRequest = FastifyRequest>(
     try {
       return await fn(request, reply);
     } catch (error: any) {
-      request.log.error(error);
+      logger.error(`Handler failed for ${request.method} ${request.url}`, error);
       return sendError(reply, {
         statusCode: error.statusCode || error.status || 500,
         message: error.message || "An unexpected error occurred",
@@ -72,3 +76,4 @@ export function catchAsync<Req extends FastifyRequest = FastifyRequest>(
     }
   };
 }
+

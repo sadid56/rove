@@ -130,9 +130,9 @@ export function DashboardHeader({ onOpenMobileMenu }: { onOpenMobileMenu: () => 
                     {idx > 0 && <BreadcrumbSeparator />}
                     <BreadcrumbItem>
                       {crumb.href && !isLast ? (
-                        <Link href={crumb.href} passHref legacyBehavior>
-                          <BreadcrumbLink>{crumb.label}</BreadcrumbLink>
-                        </Link>
+                        <BreadcrumbLink asChild>
+                          <Link href={crumb.href}>{crumb.label}</Link>
+                        </BreadcrumbLink>
                       ) : (
                         <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                       )}
