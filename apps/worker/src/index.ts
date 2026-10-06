@@ -6,9 +6,6 @@ import { runScan } from "./runner";
 import { logger } from "@repo/config";
 import { createWorkerServer } from "./server";
 
-
-
-
 const runningScans = new Set<string>();
 
 export async function processAvailableJobs(): Promise<void> {

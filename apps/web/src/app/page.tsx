@@ -2,8 +2,11 @@ import React from "react";
 import Link from "next/link";
 import { ArrowRight, Globe, Activity, Cpu, Flame, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { Button, Card, CardContent, Badge, RoveLogo } from "@repo/ui";
+import { getApiUrl } from "@/lib/env";
 
 export default function LandingPage() {
+  const docsUrl = `${getApiUrl()}/docs`;
+
   return (
     <div className='min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20 selection:text-primary'>
       <header className='border-b border-border/80 sticky top-0 z-40 bg-background/80 backdrop-blur-md'>
@@ -20,7 +23,7 @@ export default function LandingPage() {
               Workflow
             </a>
             <a
-              href='http://localhost:4000/docs'
+              href={docsUrl}
               target='_blank'
               rel='noreferrer'
               className='hover:text-foreground transition-colors flex items-center gap-1'

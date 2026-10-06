@@ -89,6 +89,11 @@ export const authContract = {
       summary: "Reset password using reset token",
     })
     .input(resetPasswordSchema),
+  session: oc.route({
+    method: "GET",
+    path: "/auth/session",
+    summary: "Get current authenticated session",
+  }),
 };
 
 export const userContract = {

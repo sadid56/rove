@@ -1,56 +1,21 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-
-const API_URL = process.env.API_URL || "http://localhost:4000";
-
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("better-auth.session_token")?.value;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (sessionToken) {
-    headers["Cookie"] = `better-auth.session_token=${sessionToken}`;
-  }
-  return headers;
-}
+import { api } from "@/lib/orpc.server";
+import type { CreateProjectInput } from "@repo/contract";
 
 export async function deleteProject(projectId: string) {
   if (!projectId) throw new Error("Project ID is required");
 
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/rpc/projects/delete`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ id: projectId }),
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData?.message || "Failed to delete project on server");
-  }
-
+  const result = await api.projects.delete({ id: projectId });
   revalidatePath("/dashboard/projects");
-  return { success: true };
+  return result;
 }
 
-export async function createProject(data: { name: string; baseUrl: string }) {
+export async function createProject(data: CreateProjectInput) {
   if (!data.name || !data.baseUrl) throw new Error("Name and baseUrl are required");
 
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/rpc/projects/create`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData?.message || "Failed to create project on server");
-  }
-
+  const result = await api.projects.create(data);
   revalidatePath("/dashboard/projects");
-  return await res.json();
+  return result;
 }

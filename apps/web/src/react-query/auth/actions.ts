@@ -22,9 +22,11 @@ export function useSignUp() {
 export function useSignOut() {
   return useAppMutation<void>({
     mutationFn: async () => {
+      try {
+        await client.auth.signOut();
+      } catch {}
       await fetch("/api/auth/sign-out", {
         method: "POST",
-        headers: { "Content-Type": "application/json" }
       });
     },
     invalidateKeys: [["auth"]],

@@ -1,5 +1,5 @@
 import { db, generatePageAiDiagnosis, QueryBuilder } from "@repo/database";
-import { scans, scanRoutes, pageResults, consoleEvents, runtimeErrors, networkRequests, regressions } from "@repo/database/schema";
+import { scans, pageResults, consoleEvents, runtimeErrors, networkRequests, regressions } from "@repo/database/schema";
 import { eq, desc } from "drizzle-orm";
 import type { CreateScanInput } from "@repo/contract";
 import { WORKER_URL } from "@repo/config";
@@ -142,7 +142,7 @@ export class ScansService {
       .returning();
 
     if (status === "cancelled") {
-      const workerUrl = WORKER_URL || "http://localhost:4001";
+      const workerUrl = WORKER_URL;
       fetch(`${workerUrl}/jobs/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

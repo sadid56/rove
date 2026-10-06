@@ -2,20 +2,17 @@ import { createORPCClient, type ClientContext, type ClientLink } from "@orpc/cli
 import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import type { AppContract, ContractRouterClient } from "@repo/contract";
-
-function getBaseUrl() {
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return "http://localhost:4000";
-}
+import { getRpcUrl } from "./env";
 
 function toKebabCase(str: string): string {
   return str.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 }
 
 const rawLink = new RPCLink({
-  url: () => `${getBaseUrl()}/rpc`,
+  url: () => getRpcUrl(),
+  headers: (options) => {
+    return (options?.context as any)?.headers || {};
+  },
   fetch: (input, init) => {
     return fetch(input, {
       ...init,
@@ -33,5 +30,6 @@ export const link: ClientLink<ClientContext> = {
 
 export const orpcClient: ContractRouterClient<AppContract> = createORPCClient(link);
 export const client = orpcClient;
+export const api = orpcClient;
 
 export const orpc = createTanstackQueryUtils(orpcClient);

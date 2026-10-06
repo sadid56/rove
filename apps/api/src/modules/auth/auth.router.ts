@@ -17,7 +17,14 @@ export const signUp = createProcedure(
   ({ email, password, name }) => auth.api.signUpEmail({ body: { email, password, name } })
 );
 
-export const signOut = createProcedure(authContract.signOut, () => ({ success: true }));
+export const signOut = createProcedure(authContract.signOut, async (_input, context) => {
+  if (context?.req?.headers) {
+    try {
+      await auth.api.signOut({ headers: context.req.headers });
+    } catch {}
+  }
+  return { success: true };
+});
 
 export const forgotPassword = createProcedure(authContract.forgotPassword, async ({ email }) => {
   await auth.api.requestPasswordReset({ body: { email, redirectTo: "/reset-password" } });
@@ -79,12 +86,23 @@ export const deleteUser = createProcedure(userContract.delete, async ({ id }) =>
   return { success: true };
 });
 
+export const getSession = createProcedure(authContract.session, async (_input, context) => {
+  if (context?.req?.headers) {
+    try {
+      const session = await auth.api.getSession({ headers: context.req.headers });
+      return session ?? null;
+    } catch {}
+  }
+  return null;
+});
+
 export const authRouter = {
   signIn,
   signUp,
   signOut,
   forgotPassword,
   resetPassword,
+  session: getSession,
 };
 
 export const userRouter = {

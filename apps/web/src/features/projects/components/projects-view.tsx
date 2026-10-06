@@ -20,7 +20,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { deleteProject } from "../actions";
 
 const createProjectFormSchema = z.object({
   name: z.string().min(2, "Project name must be at least 2 characters"),
@@ -64,10 +63,8 @@ export function ProjectsView() {
   const handleDelete = async (projectId: string) => {
     try {
       setDeletingId(projectId);
-      await deleteProject(projectId);
-      await refetch();
+      await deleteProjectMutation.mutateAsync(projectId);
     } catch {
-      deleteProjectMutation.mutate(projectId);
     } finally {
       setDeletingId(null);
     }

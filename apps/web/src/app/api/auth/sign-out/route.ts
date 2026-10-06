@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { api } from "@/lib/orpc.server";
 
 export async function POST() {
   const cookieStore = await cookies();
@@ -8,11 +9,7 @@ export async function POST() {
   cookieStore.delete("better-auth.dont_remember");
 
   try {
-    const apiUrl = process.env.API_URL;
-    await fetch(`${apiUrl}/api/v1/auth/sign-out`, {
-      method: "POST",
-      headers: { Origin: "http://localhost:3000" },
-    });
+    await api.auth.signOut();
   } catch {}
 
   const response = NextResponse.json({ success: true });

@@ -1,11 +1,9 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { RPCHandler } from "@orpc/server/fastify";
-import { OpenAPIHandler } from "@orpc/openapi/fastify";
 import { appRouter } from "../router";
 
 export async function registerOrpc(app: FastifyInstance): Promise<void> {
   const rpcHandler = new RPCHandler(appRouter);
-  const openApiHandler = new OpenAPIHandler(appRouter);
 
   const matcherTree = (rpcHandler as any).standardHandler?.matcher?.tree;
   if (matcherTree) {
@@ -17,66 +15,16 @@ export async function registerOrpc(app: FastifyInstance): Promise<void> {
     }
   }
 
-  // Support direct /rpc
-  app.all("/rpc", async (req, reply) => {
+  const handleV1Rpc = async (req: FastifyRequest, reply: FastifyReply) => {
     const result = await rpcHandler.handle(req, reply, {
-      prefix: "/rpc",
+      prefix: "/v1/orpc",
       context: { req, reply },
     });
     if (!result.matched) {
       return reply.status(404).send({ error: "RPC Procedure Not Found" });
     }
-  });
+  };
 
-  app.all("/rpc/*", async (req, reply) => {
-    const result = await rpcHandler.handle(req, reply, {
-      prefix: "/rpc",
-      context: { req, reply },
-    });
-    if (!result.matched) {
-      return reply.status(404).send({ error: "RPC Procedure Not Found" });
-    }
-  });
-
-  // Support /api/rpc
-  await app.register(
-    async (scope) => {
-      scope.all("/rpc", async (req, reply) => {
-        const result = await rpcHandler.handle(req, reply, {
-          prefix: "/api/rpc",
-          context: { req, reply },
-        });
-        if (!result.matched) {
-          return reply.status(404).send({ error: "RPC Procedure Not Found" });
-        }
-      });
-
-      scope.all("/rpc/*", async (req, reply) => {
-        const result = await rpcHandler.handle(req, reply, {
-          prefix: "/api/rpc",
-          context: { req, reply },
-        });
-        if (!result.matched) {
-          return reply.status(404).send({ error: "RPC Procedure Not Found" });
-        }
-      });
-    },
-    { prefix: "/api" },
-  );
-
-  await app.register(
-    async (scope) => {
-      scope.all("/*", async (req, reply) => {
-        const result = await openApiHandler.handle(req, reply, {
-          prefix: "/api/openapi",
-          context: { req, reply },
-        });
-        if (!result.matched) {
-          return reply.status(404).send({ error: "API Route Not Found" });
-        }
-      });
-    },
-    { prefix: "/api/openapi" },
-  );
-
+  app.all("/v1/orpc", handleV1Rpc);
+  app.all("/v1/orpc/*", handleV1Rpc);
 }

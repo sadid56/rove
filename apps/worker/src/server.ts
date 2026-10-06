@@ -1,7 +1,6 @@
 import fastify from "fastify";
 import cors from "@fastify/cors";
 import { recentLogs, logEmitter, logger, type LogEntry } from "@repo/config";
-
 import { runScan } from "./runner";
 import { db } from "@repo/database";
 import { scans } from "@repo/database/schema";

@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: "/v1/orpc/:path*",
+        destination: `${API_URL}/v1/orpc/:path*`,
+      },
+      {
+        source: "/v1/orpc",
+        destination: `${API_URL}/v1/orpc`,
+      },
+      {
         source: "/rpc/:path*",
         destination: `${API_URL}/rpc/:path*`,
       },

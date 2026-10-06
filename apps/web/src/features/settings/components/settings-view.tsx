@@ -11,6 +11,7 @@ import {
   Button,
   Input,
 } from "@repo/ui";
+import { getApiUrl } from "@/lib/env";
 
 export function SettingsView() {
   const [maxPages, setMaxPages] = useState("200");
@@ -88,8 +89,16 @@ export function SettingsView() {
           </CardHeader>
           <CardContent className="space-y-3 text-xs text-muted-foreground">
             <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/40 border border-border">
-              <span>API Gateway</span>
-              <span className="text-foreground">http://localhost:4000/api/v1</span>
+              <span>oRPC Gateway</span>
+              <span className="text-foreground">
+                {(() => {
+                  try {
+                    return `${getApiUrl()}/v1/orpc`;
+                  } catch {
+                    return "Not configured";
+                  }
+                })()}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/40 border border-border">
               <span>Supabase Pooler</span>

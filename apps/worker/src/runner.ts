@@ -4,17 +4,13 @@ import { eq } from "drizzle-orm";
 import { normalizeUrl, getPathname } from "./crawler/normalizer";
 import { discoverSitemapRoutes } from "./crawler/sitemap";
 import { extractInternalLinks } from "./crawler/spider";
-import { BrowserEngine } from "./browser/engine";
-import { evaluatePageHealth } from "./analyzers/health";
+import { BrowserEngine, type PageTestResult } from "./browser/engine";
+import { evaluatePageHealth, type PageHealthEvaluation } from "./analyzers/health";
 import { detectRegressions } from "./analyzers/regression";
-import { logger } from "@repo/config";
-
-import { addActiveJob, removeActiveJob, isScanCancelled, markScanCancelled } from "./server";
+import { logger, DEFAULT_MAX_PAGES } from "@repo/config";
+import { addActiveJob, removeActiveJob, isScanCancelled } from "./server";
 import { uploadScreenshot, uploadVideo } from "./storage/r2";
 import { shouldSampleRoute, recordRouteSample } from "./crawler/pattern";
-import { DEFAULT_MAX_PAGES } from "@repo/config";
-
-
 
 function cleanText(val: string | undefined | null): string {
   if (!val) return "";
@@ -27,6 +23,224 @@ function cleanNullableText(val: string | undefined | null): string | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
+interface ScanMetrics {
+  healthyCount: number;
+  warningCount: number;
+  failedCount: number;
+  totalConsoleErrors: number;
+  totalFailedRequests: number;
+  totalBrokenAssets: number;
+  totalRuntimeErrors: number;
+  failedPagesWithAi: Array<{
+    path: string;
+    aiAnalysis?: PageAiAnalysis | null;
+    healthReasons?: string[];
+  }>;
+}
+
+
+async function resolveEffectiveMaxPages(scan: typeof scans.$inferSelect, customMaxPages?: number): Promise<number> {
+  if (customMaxPages) return customMaxPages;
+  if (scan.summary?.options?.maxPages) return scan.summary.options.maxPages;
+
+  if (scan.projectId) {
+    const [project] = await db.select().from(projects).where(eq(projects.id, scan.projectId));
+    if (project?.crawlerConfig?.maxPages) {
+      return project.crawlerConfig.maxPages;
+    }
+  }
+
+  return DEFAULT_MAX_PAGES || 100;
+}
+
+
+async function discoverInitialRoutes(
+  scan: typeof scans.$inferSelect,
+  maxPages: number,
+  patternCounts: Map<string, number>,
+): Promise<string[]> {
+  logger.discover(`Crawling sitemaps and links for ${scan.targetUrl}...`);
+
+  const discoveredUrls = new Set<string>();
+  const rootUrl = normalizeUrl(scan.targetUrl);
+
+  if (rootUrl) {
+    discoveredUrls.add(rootUrl);
+    recordRouteSample(getPathname(rootUrl), patternCounts);
+  }
+
+  const sitemapUrls = await discoverSitemapRoutes(scan.targetUrl);
+  for (const url of sitemapUrls) {
+    if (discoveredUrls.size >= maxPages) break;
+    const path = getPathname(url);
+    if (shouldSampleRoute(path, patternCounts, 1)) {
+      recordRouteSample(path, patternCounts);
+      discoveredUrls.add(url);
+    }
+  }
+
+  logger.discover(`Discovered ${discoveredUrls.size} unique route templates from sitemap & root`);
+
+  // Batch insert initial discovered routes
+  const routeRecords = Array.from(discoveredUrls).map((url) => ({
+    scanId: scan.id,
+    url: cleanText(url),
+    path: cleanText(getPathname(url)),
+    status: "pending" as const,
+  }));
+
+  if (routeRecords.length > 0) {
+    await db.insert(scanRoutes).values(routeRecords);
+  }
+
+  return Array.from(discoveredUrls);
+}
+
+async function persistPageTelemetry(pageResultId: string, testResult: PageTestResult): Promise<void> {
+  const insertPromises: Promise<any>[] = [];
+
+  if (testResult.consoleEvents.length > 0) {
+    insertPromises.push(
+      db.insert(consoleEvents).values(
+        testResult.consoleEvents.map((e) => ({
+          pageResultId,
+          type: e.type,
+          message: cleanText(e.message),
+          location: cleanNullableText(e.location),
+          stack: cleanNullableText(e.stack),
+        })),
+      ),
+    );
+  }
+
+  if (testResult.runtimeErrors.length > 0) {
+    insertPromises.push(
+      db.insert(runtimeErrors).values(
+        testResult.runtimeErrors.map((e) => ({
+          pageResultId,
+          errorType: e.errorType,
+          message: cleanText(e.message),
+          source: cleanNullableText(e.source),
+          line: e.line,
+          stack: cleanNullableText(e.stack),
+        })),
+      ),
+    );
+  }
+
+  if (testResult.networkRequests.length > 0) {
+    insertPromises.push(
+      db.insert(networkRequests).values(
+        testResult.networkRequests.map((r) => ({
+          pageResultId,
+          url: cleanText(r.url),
+          method: r.method,
+          status: r.status,
+          resourceType: r.resourceType,
+          durationMs: r.durationMs,
+          failed: r.failed,
+          failureReason: cleanNullableText(r.failureReason),
+        })),
+      ),
+    );
+  }
+
+  if (insertPromises.length > 0) {
+    await Promise.all(insertPromises);
+  }
+}
+
+async function harvestInternalLinks(
+  html: string,
+  scan: typeof scans.$inferSelect,
+  visited: Set<string>,
+  queue: string[],
+  patternCounts: Map<string, number>,
+  effectiveMaxPages: number,
+): Promise<void> {
+  if (visited.size + queue.length >= effectiveMaxPages || !html) return;
+
+  const newlyDiscovered = extractInternalLinks(html, scan.targetUrl);
+  const newRoutesToInsert: Array<{
+    scanId: string;
+    url: string;
+    path: string;
+    status: "pending";
+    discoveredVia: string;
+  }> = [];
+
+  for (const link of newlyDiscovered) {
+    const linkPath = getPathname(link);
+    if (
+      !visited.has(link) &&
+      !queue.includes(link) &&
+      shouldSampleRoute(linkPath, patternCounts, 1) &&
+      visited.size + queue.length < effectiveMaxPages
+    ) {
+      recordRouteSample(linkPath, patternCounts);
+      queue.push(link);
+      newRoutesToInsert.push({
+        scanId: scan.id,
+        url: cleanText(link),
+        path: cleanText(linkPath),
+        status: "pending",
+        discoveredVia: "spider",
+      });
+    }
+  }
+
+  if (newRoutesToInsert.length > 0) {
+    await db.insert(scanRoutes).values(newRoutesToInsert);
+  }
+}
+
+async function finalizeScan(
+  scan: typeof scans.$inferSelect,
+  metrics: ScanMetrics,
+  totalTested: number,
+  durationSec: number,
+): Promise<void> {
+  logger.worker(`Analyzing regression differences against baseline...`);
+  await detectRegressions(scan.id, scan.projectId);
+
+  const healthScore = totalTested > 0 ? Math.round((metrics.healthyCount / totalTested) * 100) : 100;
+
+  const scanAiSummary = generateScanAiSummary({
+    targetUrl: scan.targetUrl,
+    totalRoutes: totalTested,
+    healthyRoutes: metrics.healthyCount,
+    warningRoutes: metrics.warningCount,
+    failedRoutes: metrics.failedCount,
+    failedPages: metrics.failedPagesWithAi,
+  });
+
+  await db
+    .update(scans)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+      healthScore,
+      aiSummary: scanAiSummary,
+      summary: {
+        ...(scan.summary || {}),
+        consoleErrors: metrics.totalConsoleErrors,
+        failedRequests: metrics.totalFailedRequests,
+        brokenAssets: metrics.totalBrokenAssets,
+        runtimeErrors: metrics.totalRuntimeErrors,
+      },
+    })
+    .where(eq(scans.id, scan.id as any));
+
+  logger.complete(scan.targetUrl, {
+    score: healthScore,
+    total: totalTested,
+    healthy: metrics.healthyCount,
+    failed: metrics.failedCount,
+    durationSec,
+  });
+}
+
+// main
 export async function runScan(scanId: string, customMaxPages?: number): Promise<void> {
   const [scan] = await db
     .select()
@@ -34,108 +248,52 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
     .where(eq(scans.id, scanId as any));
   if (!scan) return;
 
-  let effectiveMaxPages = customMaxPages || DEFAULT_MAX_PAGES || 100;
-
-  if (scan.projectId) {
-    const [project] = await db.select().from(projects).where(eq(projects.id, scan.projectId));
-    if (project?.crawlerConfig?.maxPages) {
-      effectiveMaxPages = project.crawlerConfig.maxPages;
-    }
-  }
-
-  if (scan.summary?.options?.maxPages) {
-    effectiveMaxPages = scan.summary.options.maxPages;
-  }
-
+  const effectiveMaxPages = await resolveEffectiveMaxPages(scan, customMaxPages);
   addActiveJob({ scanId: scan.id, targetUrl: scan.targetUrl });
   const startTime = Date.now();
-  logger.worker(`Initiating QA scan for: ${scan.targetUrl} (Max page ceiling: ${effectiveMaxPages})`);
 
+  logger.worker(`Initiating QA scan for: ${scan.targetUrl} (Max page ceiling: ${effectiveMaxPages})`);
   const engine = new BrowserEngine();
 
   try {
+    // 1. Discovery Phase
     await db
       .update(scans)
       .set({ status: "discovering", startedAt: new Date() })
       .where(eq(scans.id, scanId as any));
 
-    logger.discover(`Crawling sitemaps and links for ${scan.targetUrl}...`);
-
     const patternCounts = new Map<string, number>();
-    const maxSamplesPerPattern = 1;
-
-    const discoveredUrls = new Set<string>();
-    const rootUrl = normalizeUrl(scan.targetUrl);
-    if (rootUrl) {
-      discoveredUrls.add(rootUrl);
-      recordRouteSample(getPathname(rootUrl), patternCounts);
-    }
-
-    const sitemapUrls = await discoverSitemapRoutes(scan.targetUrl);
-    for (const url of sitemapUrls) {
-      if (discoveredUrls.size >= effectiveMaxPages) break;
-      const path = getPathname(url);
-      if (shouldSampleRoute(path, patternCounts, maxSamplesPerPattern)) {
-        recordRouteSample(path, patternCounts);
-        discoveredUrls.add(url);
-      }
-    }
-
-    logger.discover(`Discovered ${discoveredUrls.size} unique route templates from sitemap & root`);
-
-    const routeRecords: { scanId: any; url: string; path: string; status: any }[] = [];
-    for (const url of discoveredUrls) {
-      routeRecords.push({
-        scanId: scan.id,
-        url: cleanText(url),
-        path: cleanText(getPathname(url)),
-        status: "pending",
-      });
-    }
-
-    if (routeRecords.length > 0) {
-      await db.insert(scanRoutes).values(routeRecords);
-    }
+    const initialUrls = await discoverInitialRoutes(scan, effectiveMaxPages, patternCounts);
 
     await db
       .update(scans)
       .set({
         status: "scanning",
-        totalRoutes: discoveredUrls.size,
+        totalRoutes: initialUrls.length,
       })
       .where(eq(scans.id, scanId as any));
 
-    const queue = Array.from(discoveredUrls);
+    // 2. Queue Execution Phase
+    const queue = [...initialUrls];
     const visited = new Set<string>();
 
-    let healthyCount = 0;
-    let warningCount = 0;
-    let failedCount = 0;
-    let totalConsoleErrors = 0;
-    let totalFailedRequests = 0;
-    let totalBrokenAssets = 0;
-    let totalRuntimeErrors = 0;
-    const failedPagesWithAi: Array<{
-      path: string;
-      aiAnalysis?: PageAiAnalysis | null;
-      healthReasons?: string[];
-    }> = [];
+    const metrics: ScanMetrics = {
+      healthyCount: 0,
+      warningCount: 0,
+      failedCount: 0,
+      totalConsoleErrors: 0,
+      totalFailedRequests: 0,
+      totalBrokenAssets: 0,
+      totalRuntimeErrors: 0,
+      failedPagesWithAi: [],
+    };
 
     const shouldRecordVideos = scan.summary?.options?.recordVideos !== false;
 
     while (queue.length > 0 && visited.size < effectiveMaxPages) {
+      // Instant in-memory cancellation check (zero database latency)
       if (isScanCancelled(scan.id)) {
         logger.worker(`Scan [${scan.id}] cancelled. Stopping crawler immediately.`);
-        break;
-      }
-
-      const [currentStatus] = await db
-        .select({ status: scans.status })
-        .from(scans)
-        .where(eq(scans.id, scanId as any));
-      if (currentStatus?.status === "cancelled") {
-        logger.worker(`Scan [${scan.id}] marked as cancelled in database. Stopping crawler.`);
-        markScanCancelled(scan.id);
         break;
       }
 
@@ -143,85 +301,95 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
       if (visited.has(currentUrl)) continue;
       visited.add(currentUrl);
 
+      const routePath = getPathname(currentUrl);
       logger.test(visited.size, effectiveMaxPages, currentUrl);
 
+      // Execute Playwright Browser Test
       const testResult = await engine.testRoute(currentUrl, {
         captureScreenshot: true,
         recordVideo: shouldRecordVideos,
         autoScroll: shouldRecordVideos,
       });
+
       const health = evaluatePageHealth(testResult, scan.targetUrl);
 
+      // Track health metrics
       if (health.healthStatus === "healthy") {
-        healthyCount++;
-        logger.healthy(getPathname(currentUrl), testResult.httpStatus, testResult.loadTimeMs);
+        metrics.healthyCount++;
+        logger.healthy(routePath, testResult.httpStatus, testResult.loadTimeMs);
       } else if (health.healthStatus === "warning") {
-        warningCount++;
-        logger.warning(getPathname(currentUrl), health.healthReasons, testResult.httpStatus, testResult.loadTimeMs);
+        metrics.warningCount++;
+        logger.warning(routePath, health.healthReasons, testResult.httpStatus, testResult.loadTimeMs);
       } else {
-        failedCount++;
-        logger.failed(getPathname(currentUrl), health.healthReasons, testResult.httpStatus, testResult.loadTimeMs);
+        metrics.failedCount++;
+        logger.failed(routePath, health.healthReasons, testResult.httpStatus, testResult.loadTimeMs);
       }
 
-      totalConsoleErrors += health.consoleSummary.errors;
-      totalFailedRequests += health.networkSummary.failed;
-      totalBrokenAssets += health.networkSummary.assetsFailed;
-      totalRuntimeErrors += testResult.runtimeErrors.length;
+      metrics.totalConsoleErrors += health.consoleSummary.errors;
+      metrics.totalFailedRequests += health.networkSummary.failed;
+      metrics.totalBrokenAssets += health.networkSummary.assetsFailed;
+      metrics.totalRuntimeErrors += testResult.runtimeErrors.length;
 
-      let screenshotKey: string | undefined;
-      if (testResult.screenshotBuffer) {
-        screenshotKey = await uploadScreenshot({
-          buffer: testResult.screenshotBuffer,
-          scanId: scan.id,
-          routePath: getPathname(currentUrl),
-          contentType: "image/jpeg",
-        });
-      }
-
-      let videoKey: string | undefined;
-      if (testResult.videoBuffer) {
-        videoKey = await uploadVideo({
-          buffer: testResult.videoBuffer,
-          scanId: scan.id,
-          routePath: getPathname(currentUrl),
-        });
-      }
-
-      let pageAiDiagnosis: PageAiAnalysis | undefined;
-      if (
+      const hasDegradedIssues =
         health.healthStatus !== "healthy" ||
         testResult.runtimeErrors.length > 0 ||
         health.consoleSummary.errors > 0 ||
-        health.networkSummary.failed > 0
-      ) {
-        pageAiDiagnosis = await generatePageAiDiagnosis({
-          routePath: getPathname(currentUrl),
-          url: currentUrl,
-          httpStatus: testResult.httpStatus,
-          healthStatus: health.healthStatus,
-          healthReasons: health.healthReasons,
-          renderingType: health.renderingType,
-          consoleEvents: testResult.consoleEvents,
-          runtimeErrors: testResult.runtimeErrors,
-          networkRequests: testResult.networkRequests,
-        });
+        health.networkSummary.failed > 0;
 
-        failedPagesWithAi.push({
-          path: getPathname(currentUrl),
+      // PARALLEL PIPELINE: Run Cloudflare R2 uploads and Gemini AI Diagnosis concurrently!
+      const [mediaKeys, pageAiDiagnosis] = await Promise.all([
+        Promise.all([
+          testResult.screenshotBuffer
+            ? uploadScreenshot({
+                buffer: testResult.screenshotBuffer,
+                scanId: scan.id,
+                routePath,
+                contentType: "image/jpeg",
+              })
+            : Promise.resolve(undefined),
+          testResult.videoBuffer
+            ? uploadVideo({
+                buffer: testResult.videoBuffer,
+                scanId: scan.id,
+                routePath,
+              })
+            : Promise.resolve(undefined),
+        ]),
+        hasDegradedIssues
+          ? generatePageAiDiagnosis({
+              routePath,
+              url: currentUrl,
+              httpStatus: testResult.httpStatus,
+              healthStatus: health.healthStatus,
+              healthReasons: health.healthReasons,
+              renderingType: health.renderingType,
+              consoleEvents: testResult.consoleEvents,
+              runtimeErrors: testResult.runtimeErrors,
+              networkRequests: testResult.networkRequests,
+            })
+          : Promise.resolve(undefined),
+      ]);
+
+      const [screenshotKey, videoKey] = mediaKeys;
+
+      if (hasDegradedIssues && pageAiDiagnosis) {
+        metrics.failedPagesWithAi.push({
+          path: routePath,
           aiAnalysis: pageAiDiagnosis,
           healthReasons: health.healthReasons,
         });
       }
 
+      // Persist Page Result
       const [savedPageResult] = await db
         .insert(pageResults)
         .values({
           scanId: scan.id,
           url: cleanText(currentUrl),
-          path: cleanText(getPathname(currentUrl)),
+          path: cleanText(routePath),
           httpStatus: testResult.httpStatus,
           healthStatus: health.healthStatus,
-          healthReasons: health.healthReasons.map((r) => cleanText(r)),
+          healthReasons: health.healthReasons.map(cleanText),
           renderingType: health.renderingType,
           loadTimeMs: testResult.loadTimeMs,
           screenshotUrl: screenshotKey,
@@ -232,84 +400,28 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
         })
         .returning();
 
-
+      // Parallel insert of child telemetry records
       if (savedPageResult) {
-        if (testResult.consoleEvents.length > 0) {
-          await db.insert(consoleEvents).values(
-            testResult.consoleEvents.map((e) => ({
-              pageResultId: savedPageResult.id,
-              type: e.type,
-              message: cleanText(e.message),
-              location: cleanNullableText(e.location),
-              stack: cleanNullableText(e.stack),
-            })),
-          );
-        }
-
-        if (testResult.runtimeErrors.length > 0) {
-          await db.insert(runtimeErrors).values(
-            testResult.runtimeErrors.map((e) => ({
-              pageResultId: savedPageResult.id,
-              errorType: e.errorType,
-              message: cleanText(e.message),
-              source: cleanNullableText(e.source),
-              line: e.line,
-              stack: cleanNullableText(e.stack),
-            })),
-          );
-        }
-
-        if (testResult.networkRequests.length > 0) {
-          await db.insert(networkRequests).values(
-            testResult.networkRequests.map((r) => ({
-              pageResultId: savedPageResult.id,
-              url: cleanText(r.url),
-              method: r.method,
-              status: r.status,
-              resourceType: r.resourceType,
-              durationMs: r.durationMs,
-              failed: r.failed,
-              failureReason: cleanNullableText(r.failureReason),
-            })),
-          );
-        }
+        await persistPageTelemetry(savedPageResult.id, testResult);
       }
 
-      if (visited.size < effectiveMaxPages && testResult.html) {
-        const newlyDiscovered = extractInternalLinks(testResult.html, scan.targetUrl);
-        for (const link of newlyDiscovered) {
-          const linkPath = getPathname(link);
-          if (
-            !visited.has(link) &&
-            !queue.includes(link) &&
-            shouldSampleRoute(linkPath, patternCounts, maxSamplesPerPattern) &&
-            visited.size + queue.length < effectiveMaxPages
-          ) {
-            recordRouteSample(linkPath, patternCounts);
-            queue.push(link);
-            await db.insert(scanRoutes).values({
-              scanId: scan.id,
-              url: cleanText(link),
-              path: cleanText(linkPath),
-              status: "pending",
-              discoveredVia: "spider",
-            });
-          }
-        }
-      }
+      // Spider newly discovered links from page HTML
+      await harvestInternalLinks(testResult.html, scan, visited, queue, patternCounts, effectiveMaxPages);
 
+      // Update live progression in database
       await db
         .update(scans)
         .set({
           testedRoutes: visited.size,
-          healthyRoutes: healthyCount,
-          warningRoutes: warningCount,
-          failedRoutes: failedCount,
+          healthyRoutes: metrics.healthyCount,
+          warningRoutes: metrics.warningCount,
+          failedRoutes: metrics.failedCount,
           totalRoutes: visited.size + queue.length,
         })
         .where(eq(scans.id, scanId as any));
     }
 
+    // Cancellation check
     if (isScanCancelled(scan.id)) {
       await db
         .update(scans)
@@ -319,52 +431,14 @@ export async function runScan(scanId: string, customMaxPages?: number): Promise<
       return;
     }
 
+    // 3. Finalization Phase
     await db
       .update(scans)
       .set({ status: "analyzing" })
       .where(eq(scans.id, scanId as any));
 
-    logger.worker(`Analyzing regression differences against baseline...`);
-    await detectRegressions(scan.id, scan.projectId);
-
-    const totalTested = visited.size;
-    const healthScore = totalTested > 0 ? Math.round((healthyCount / totalTested) * 100) : 100;
     const durationSec = (Date.now() - startTime) / 1000;
-
-    const scanAiSummary = generateScanAiSummary({
-      targetUrl: scan.targetUrl,
-      totalRoutes: totalTested,
-      healthyRoutes: healthyCount,
-      warningRoutes: warningCount,
-      failedRoutes: failedCount,
-      failedPages: failedPagesWithAi,
-    });
-
-    await db
-      .update(scans)
-      .set({
-        status: "completed",
-        completedAt: new Date(),
-        healthScore,
-        aiSummary: scanAiSummary,
-        summary: {
-          ...(scan.summary || {}),
-          consoleErrors: totalConsoleErrors,
-          failedRequests: totalFailedRequests,
-          brokenAssets: totalBrokenAssets,
-          runtimeErrors: totalRuntimeErrors,
-        },
-      })
-      .where(eq(scans.id, scanId as any));
-
-
-    logger.complete(scan.targetUrl, {
-      score: healthScore,
-      total: totalTested,
-      healthy: healthyCount,
-      failed: failedCount,
-      durationSec,
-    });
+    await finalizeScan(scan, metrics, visited.size, durationSec);
   } catch (error) {
     logger.error(`Scan failed for ${scan.targetUrl}:`, error);
     await db
