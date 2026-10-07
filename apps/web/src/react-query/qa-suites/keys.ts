@@ -15,10 +15,6 @@ export const qaKeys = {
     all: ["qa", "team"] as const,
     list: (params?: any) => [...qaKeys.team.all, "list", params] as const,
   },
-  personas: {
-    all: ["qa", "personas"] as const,
-    list: () => [...qaKeys.personas.all, "list"] as const,
-  },
   security: {
     all: ["qa", "security"] as const,
     findings: (params?: any) => [...qaKeys.security.all, "findings", params] as const,

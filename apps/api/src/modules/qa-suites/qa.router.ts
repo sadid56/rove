@@ -24,10 +24,6 @@ export const qaRouter = {
     list: createProcedure(qaContract.team.list, (input) => qaService.listTeam(input)),
     invite: createProcedure(qaContract.team.invite, (input) => qaService.inviteTeamMember(input)),
   },
-  personas: {
-    list: createProcedure(qaContract.personas.list, () => qaService.listPersonas()),
-    run: createProcedure(qaContract.personas.run, (input) => qaService.runPersona(input)),
-  },
   security: {
     listFindings: createProcedure(qaContract.security.listFindings, (input) => qaService.listSecurityFindings(input)),
     runScan: createProcedure(qaContract.security.runScan, () => qaService.runSecurityScan()),

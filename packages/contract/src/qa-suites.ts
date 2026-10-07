@@ -69,10 +69,6 @@ export const createPortalSessionSchema = z.object({
 export type CreateCheckoutSessionInput = z.infer<typeof createCheckoutSessionSchema>;
 export type CreatePortalSessionInput = z.infer<typeof createPortalSessionSchema>;
 
-export const runPersonaSchema = z.object({
-  id: z.string().min(1, "Persona ID is required"),
-});
-
 export const runVisionAuditSchema = z.object({
   route: z.string().optional(),
 });
@@ -81,7 +77,6 @@ export const createPrSchema = z.object({
   id: z.string().min(1, "Fix ID is required"),
 });
 
-export type RunPersonaInput = z.infer<typeof runPersonaSchema>;
 export type RunVisionAuditInput = z.infer<typeof runVisionAuditSchema>;
 export type CreatePrInput = z.infer<typeof createPrSchema>;
 
@@ -124,10 +119,6 @@ export const qaContract = {
   team: {
     list: oc.route({ method: "GET", path: "/qa/team", summary: "List team members" }).input(listPaginationQuerySchema),
     invite: oc.route({ method: "POST", path: "/qa/team/invite", summary: "Invite team member" }).input(inviteTeamMemberSchema),
-  },
-  personas: {
-    list: oc.route({ method: "GET", path: "/qa/personas", summary: "List synthetic personas" }),
-    run: oc.route({ method: "POST", path: "/qa/personas/{id}/run", summary: "Run synthetic persona" }).input(runPersonaSchema),
   },
   security: {
     listFindings: oc.route({ method: "GET", path: "/qa/security/findings", summary: "List security findings" }).input(listPaginationQuerySchema),

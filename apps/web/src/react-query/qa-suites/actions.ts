@@ -248,33 +248,6 @@ export function useAskRove() {
   });
 }
 
-export interface PersonaItem {
-  id: string;
-  name: string;
-  role: string;
-  description: string;
-  behavior: string;
-  healthScore: number;
-  status: "passed" | "warning" | "failed";
-  findings: string[];
-}
-
-export function usePersonas() {
-  return useQuery({
-    queryKey: qaKeys.personas.list(),
-    queryFn: () => (client as any).qa.personas.list() as Promise<PersonaItem[]>,
-  });
-}
-
-export function useRunPersona() {
-  return useAppMutation<{ id: string }>({
-    mutationFn: ({ id }) => (client as any).qa.personas.run({ id }),
-    invalidateKeys: [qaKeys.personas.all as any],
-    successMessage: "Persona stress execution complete",
-    errorMessage: "Failed to run persona",
-  });
-}
-
 export interface SecurityFindingItem {
   id: string;
   category: "Secret Leak" | "PII Exposure" | "Security Headers" | "CORS & Auth";
