@@ -1,5 +1,12 @@
 import type { PageAiAnalysis, ScanAiSummary } from "./schema/scans";
-import { GEMINI_API_KEY, GEMINI_MODEL } from "@repo/config";
+import {
+  AI_PROVIDER,
+  AI_MODEL,
+  GEMINI_API_KEY,
+  GEMINI_MODEL,
+  OPENAI_API_KEY,
+  OPENAI_MODEL,
+} from "@repo/config";
 
 export interface PageDiagnosisInput {
   routePath: string;
@@ -53,15 +60,20 @@ export async function generatePageAiDiagnosis(input: PageDiagnosisInput): Promis
     };
   }
 
-  // Check for Google Gemini API Key
-  const geminiApiKey = GEMINI_API_KEY;
-
-  if (geminiApiKey) {
+  // Route AI diagnostic call based on active provider (OpenAI / Gemini)
+  if (AI_PROVIDER === "openai" && OPENAI_API_KEY) {
     try {
-      const geminiResult = await callGeminiDiagnosis(input, geminiApiKey);
+      const openAiResult = await callOpenAiDiagnosis(input, OPENAI_API_KEY);
+      if (openAiResult) return openAiResult;
+    } catch {
+      // Fallback
+    }
+  } else if (GEMINI_API_KEY) {
+    try {
+      const geminiResult = await callGeminiDiagnosis(input, GEMINI_API_KEY);
       if (geminiResult) return geminiResult;
     } catch {
-      // Fallback to heuristic advisor if Gemini call fails
+      // Fallback to heuristic advisor if call fails
     }
   }
 
@@ -69,7 +81,7 @@ export async function generatePageAiDiagnosis(input: PageDiagnosisInput): Promis
   return generateHeuristicDiagnosis(input);
 }
 
-function generateHeuristicDiagnosis(input: PageDiagnosisInput): PageAiAnalysis {
+export function generateHeuristicDiagnosis(input: PageDiagnosisInput): PageAiAnalysis {
   const { routePath, httpStatus, healthReasons = [], consoleEvents = [], runtimeErrors = [], networkRequests = [] } = input;
 
   const now = new Date().toISOString();
@@ -324,6 +336,100 @@ Respond ONLY with valid JSON. Do not wrap in markdown quotes if possible, or wra
     }
   } catch (err) {
     console.error("[Gemini AI] Exception while calling Gemini diagnosis:", err);
+  }
+
+  return null;
+}
+
+async function callOpenAiDiagnosis(input: PageDiagnosisInput, openAiKey: string): Promise<PageAiAnalysis | null> {
+  const promptContext = {
+    route: input.routePath,
+    status: input.httpStatus,
+    healthReasons: input.healthReasons,
+    consoleErrors: input.consoleEvents
+      ?.filter((c) => c.type === "error")
+      .map((c) => ({
+        message: c.message,
+        location: c.location,
+      })),
+    runtimeErrors: input.runtimeErrors?.map((r) => ({
+      type: r.errorType,
+      message: r.message,
+      stack: r.stack?.slice(0, 300),
+    })),
+    failedNetwork: input.networkRequests
+      ?.filter((n) => n.failed)
+      .map((n) => ({
+        url: n.url,
+        method: n.method,
+        status: n.status,
+        reason: n.failureReason,
+      })),
+  };
+
+  const systemPrompt = `You are an elite autonomous Web QA engineer and diagnostic agent for production web apps.
+Analyze the following test failure data collected from headless Chromium browser execution.
+Provide a structured JSON output with the exact keys:
+- severity: "critical" | "warning" | "info"
+- rootCause: string (1-2 sentences identifying root cause)
+- summary: string (clear explanation of why this happened)
+- impact: string (what happens to end users)
+- suggestedFixes: string[] (actionable step-by-step developer advice)
+- codePatch: string (clean, copy-pasteable TypeScript/React code solution)
+- detectedCategories: string[] (e.g. ["hydration", "network", "runtime"])
+
+Respond ONLY with valid JSON. Do not wrap in markdown quotes if possible, or wrap in \`\`\`json.`;
+
+  const modelName = (AI_MODEL || OPENAI_MODEL || "gpt-4o-mini").trim();
+  const url = "https://api.openai.com/v1/chat/completions";
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openAiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Data:\n${JSON.stringify(promptContext, null, 2)}` },
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const rawText = data?.choices?.[0]?.message?.content;
+      if (rawText) {
+        let cleanJson = rawText.trim();
+        if (cleanJson.startsWith("```json")) {
+          cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+        } else if (cleanJson.startsWith("```")) {
+          cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+        }
+        const parsed = JSON.parse(cleanJson);
+        return {
+          status: "analyzed",
+          severity: parsed.severity || "warning",
+          rootCause: parsed.rootCause || "Issue detected",
+          summary: parsed.summary || "",
+          impact: parsed.impact || "",
+          suggestedFixes: parsed.suggestedFixes || [],
+          codePatch: parsed.codePatch,
+          detectedCategories: parsed.detectedCategories || [],
+          analyzedAt: new Date().toISOString(),
+        };
+      }
+    } else {
+      const errorText = await res.text();
+      console.error(`[OpenAI] API call returned status ${res.status}:`, errorText);
+    }
+  } catch (err) {
+    console.error("[OpenAI] Exception while calling OpenAI diagnosis:", err);
   }
 
   return null;

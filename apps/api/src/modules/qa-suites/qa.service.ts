@@ -10,11 +10,10 @@ import {
 } from "@repo/database/schema";
 import { eq, desc, and, ne } from "drizzle-orm";
 import {
-  GEMINI_API_KEY,
-  GEMINI_MODEL,
   STRIPE_SECRET_KEY,
   NEXT_PUBLIC_APP_URL,
 } from "@repo/config";
+import { aiCore } from "../../services/aiCore";
 import Stripe from "stripe";
 import type {
   CreateJourneyInput,
@@ -429,47 +428,6 @@ export class QaService {
   }
 
   async aiChat(input: AiChatInput) {
-    const apiKey = GEMINI_API_KEY;
-    const model = GEMINI_MODEL || "gemini-2.5-pro";
-
-    if (apiKey) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: "user",
-                  parts: [
-                    {
-                      text: `You are ROVE, an elite autonomous Web QA Intelligence diagnostic engine. Answer this question concisely for the engineering team: "${input.prompt}"`,
-                    },
-                  ],
-                },
-              ],
-            }),
-          }
-        );
-
-        if (response.ok) {
-          const data = (await response.json()) as any;
-          const candidateText =
-            data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidateText) {
-            return {
-              reply: candidateText,
-              timestamp: "Just now",
-            };
-          }
-        }
-      } catch {
-        // Fallback if network or quota issue
-      }
-    }
-
     const recentScans = await db.select().from(scans).orderBy(desc(scans.createdAt)).limit(3);
     const recentIssues = await db.select().from(qaIssues).orderBy(desc(qaIssues.createdAt)).limit(3);
 
@@ -480,13 +438,16 @@ export class QaService {
       .map((i) => `[${i.issueKey}] ${i.title} (${i.severity}) on ${i.route}`)
       .join("; ");
 
+    const telemetryContext = `${recentScans.length} recorded scans (${scanContext || "no active failures"}). Open triage items: ${issueContext || "all routes clean"}.`;
+
+    const result = await aiCore.chat({
+      prompt: input.prompt,
+      context: telemetryContext,
+    });
+
     return {
-      reply: `Rove Telemetry Diagnostic: For inquiry "${input.prompt}", workspace analysis indicates ${
-        recentScans.length
-      } recorded scans (${scanContext || "no active failures"}). Open triage items: ${
-        issueContext || "all routes clean"
-      }. Recommended action: monitor TTFB latency spikes and verify zero unhandled rejections.`,
-      timestamp: "Just now",
+      reply: result.reply,
+      timestamp: result.timestamp,
     };
   }
 

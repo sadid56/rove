@@ -63,9 +63,13 @@ export interface EnvironmentVariables {
   DEFAULT_MAX_PAGES: number;
   BROWSER_USER_AGENT: string;
 
-  // Google Gemini AI Diagnostics
+  // AI Diagnostics & Provider (Gemini / OpenAI GPT)
+  AI_PROVIDER: string;
+  AI_MODEL: string;
   GEMINI_API_KEY: string;
   GEMINI_MODEL: string;
+  OPENAI_API_KEY: string;
+  OPENAI_MODEL: string;
 
   // Cloudflare R2 / Object Storage
   R2_ACCOUNT_ID: string;
@@ -139,8 +143,12 @@ const MAX_CONCURRENT_SCANS = Number(raw.MAX_CONCURRENT_SCANS || 3);
 const DEFAULT_MAX_PAGES = Number(raw.DEFAULT_MAX_PAGES || 100);
 const BROWSER_USER_AGENT = raw.BROWSER_USER_AGENT || "";
 
+const AI_PROVIDER = (raw.AI_PROVIDER || "gemini").toLowerCase();
 const GEMINI_API_KEY = raw.GEMINI_API_KEY || "";
 const GEMINI_MODEL = raw.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const OPENAI_API_KEY = raw.OPENAI_API_KEY || "";
+const OPENAI_MODEL = raw.OPENAI_MODEL || "gpt-4o-mini";
+const AI_MODEL = raw.AI_MODEL || (AI_PROVIDER === "openai" ? OPENAI_MODEL : GEMINI_MODEL);
 
 const R2_ACCOUNT_ID = raw.R2_ACCOUNT_ID || "";
 const R2_ACCESS_KEY_ID = raw.R2_ACCESS_KEY_ID || "";
@@ -172,8 +180,12 @@ export const appConfig = (): EnvironmentVariables => ({
   MAX_CONCURRENT_SCANS,
   DEFAULT_MAX_PAGES,
   BROWSER_USER_AGENT,
+  AI_PROVIDER,
+  AI_MODEL,
   GEMINI_API_KEY,
   GEMINI_MODEL,
+  OPENAI_API_KEY,
+  OPENAI_MODEL,
   R2_ACCOUNT_ID,
   R2_ACCESS_KEY_ID,
   R2_SECRET_ACCESS_KEY,
@@ -205,8 +217,12 @@ export {
   MAX_CONCURRENT_SCANS,
   DEFAULT_MAX_PAGES,
   BROWSER_USER_AGENT,
+  AI_PROVIDER,
+  AI_MODEL,
   GEMINI_API_KEY,
   GEMINI_MODEL,
+  OPENAI_API_KEY,
+  OPENAI_MODEL,
   R2_ACCOUNT_ID,
   R2_ACCESS_KEY_ID,
   R2_SECRET_ACCESS_KEY,
