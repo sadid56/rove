@@ -70,3 +70,24 @@ export const billingSubscriptions = pgTable("billing_subscriptions", {
   renewsAt: text("renews_at").default("November 1, 2026"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const integrations = pgTable("integrations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  serviceKey: text("service_key").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  enabled: boolean("enabled").notNull().default(false),
+  config: jsonb("config").$type<{
+    webhookUrl?: string;
+    repoName?: string;
+    channel?: string;
+    healthThreshold?: number;
+    blockMergeOnFailure?: boolean;
+    autoScan?: boolean;
+    projectKey?: string;
+  }>().default({}),
+  lastTriggeredAt: text("last_triggered_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+

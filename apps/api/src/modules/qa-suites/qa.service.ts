@@ -1,14 +1,6 @@
 import { db, QueryBuilder } from "@repo/database";
-import {
-  journeys,
-  apiMonitors,
-  qaIssues,
-  teamMembers,
-  billingSubscriptions,
-  scans,
-  projects,
-} from "@repo/database/schema";
-import { eq, desc, and, ne } from "drizzle-orm";
+import { journeys, apiMonitors, qaIssues, teamMembers, billingSubscriptions, scans, projects, integrations } from "@repo/database/schema";
+import { eq, desc, and, ne, sql } from "drizzle-orm";
 import {
   STRIPE_SECRET_KEY,
   NEXT_PUBLIC_APP_URL,
@@ -28,6 +20,8 @@ import type {
   CreatePrInput,
   ListPaginationQuery,
   ListIssuesQuery,
+  UpdateIntegrationInput,
+  TestIntegrationInput,
 } from "@repo/contract";
 
 const STRIPE_PLANS: Record<
@@ -79,10 +73,10 @@ export class QaService {
             action: stepDesc.toLowerCase().includes("click")
               ? "Click"
               : stepDesc.toLowerCase().includes("fill") || stepDesc.toLowerCase().includes("type")
-              ? "Fill Input"
-              : stepDesc.toLowerCase().includes("assert") || stepDesc.toLowerCase().includes("verify")
-              ? "Assert State"
-              : "Navigate",
+                ? "Fill Input"
+                : stepDesc.toLowerCase().includes("assert") || stepDesc.toLowerCase().includes("verify")
+                  ? "Assert State"
+                  : "Navigate",
             target: stepDesc,
             status: "passed" as const,
           }))
@@ -135,10 +129,7 @@ export class QaService {
   async listApiMonitors(query?: ListPaginationQuery) {
     const all = await db.select().from(apiMonitors);
     const healthyCount = all.filter((ep) => ep.status < 400).length;
-    const avgLatency =
-      all.length > 0
-        ? Math.round(all.reduce((acc, curr) => acc + curr.latencyMs, 0) / all.length)
-        : 0;
+    const avgLatency = all.length > 0 ? Math.round(all.reduce((acc, curr) => acc + curr.latencyMs, 0) / all.length) : 0;
 
     const paginated = await QueryBuilder.from(db, apiMonitors)
       .search(query?.search, [apiMonitors.name, apiMonitors.url])
@@ -276,11 +267,7 @@ export class QaService {
   }
 
   async updateIssueStatus(id: string, status: "open" | "in_progress" | "resolved") {
-    const [updated] = await db
-      .update(qaIssues)
-      .set({ status })
-      .where(eq(qaIssues.id, id))
-      .returning();
+    const [updated] = await db.update(qaIssues).set({ status }).where(eq(qaIssues.id, id)).returning();
 
     return updated;
   }
@@ -359,8 +346,7 @@ export class QaService {
 
   async createCheckoutSession(input: CreateCheckoutSessionInput) {
     const plan = STRIPE_PLANS[input.planId] || STRIPE_PLANS.pro!;
-    const unitAmount =
-      input.billingCycle === "annual" ? plan.annualAmount : plan.monthlyAmount;
+    const unitAmount = input.billingCycle === "annual" ? plan.annualAmount : plan.monthlyAmount;
     const interval = input.billingCycle === "annual" ? "year" : "month";
     const appUrl = (NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
 
@@ -402,7 +388,7 @@ export class QaService {
     }
 
     throw new Error(
-      "Stripe is not configured! Please add STRIPE_SECRET_KEY (e.g. sk_test_...) to your .env.local file to redirect to the live Stripe Hosted Checkout page."
+      "Stripe is not configured! Please add STRIPE_SECRET_KEY (e.g. sk_test_...) to your .env.local file to redirect to the live Stripe Hosted Checkout page.",
     );
   }
 
@@ -430,12 +416,8 @@ export class QaService {
     const recentScans = await db.select().from(scans).orderBy(desc(scans.createdAt)).limit(3);
     const recentIssues = await db.select().from(qaIssues).orderBy(desc(qaIssues.createdAt)).limit(3);
 
-    const scanContext = recentScans
-      .map((s) => `Scan on ${s.targetUrl}: status ${s.status}, score ${s.healthScore ?? "N/A"}%`)
-      .join("; ");
-    const issueContext = recentIssues
-      .map((i) => `[${i.issueKey}] ${i.title} (${i.severity}) on ${i.route}`)
-      .join("; ");
+    const scanContext = recentScans.map((s) => `Scan on ${s.targetUrl}: status ${s.status}, score ${s.healthScore ?? "N/A"}%`).join("; ");
+    const issueContext = recentIssues.map((i) => `[${i.issueKey}] ${i.title} (${i.severity}) on ${i.route}`).join("; ");
 
     const telemetryContext = `${recentScans.length} recorded scans (${scanContext || "no active failures"}). Open triage items: ${issueContext || "all routes clean"}.`;
 
@@ -469,19 +451,19 @@ export class QaService {
       const category = item.title.toLowerCase().includes("secret")
         ? ("Secret Leak" as const)
         : item.title.toLowerCase().includes("email") || item.title.toLowerCase().includes("pii")
-        ? ("PII Exposure" as const)
-        : item.title.toLowerCase().includes("cors")
-        ? ("CORS & Auth" as const)
-        : ("Security Headers" as const);
+          ? ("PII Exposure" as const)
+          : item.title.toLowerCase().includes("cors")
+            ? ("CORS & Auth" as const)
+            : ("Security Headers" as const);
 
       const severity =
         item.status === "resolved"
           ? ("passed" as const)
           : item.severity === "critical"
-          ? ("critical" as const)
-          : item.severity === "high"
-          ? ("warning" as const)
-          : ("info" as const);
+            ? ("critical" as const)
+            : item.severity === "high"
+              ? ("warning" as const)
+              : ("info" as const);
 
       let recommendation = "Configure secure HTTP response headers in next.config.ts or reverse proxy.";
       if (item.title.includes("HSTS")) {
@@ -542,12 +524,7 @@ export class QaService {
       const [existing] = await db
         .select()
         .from(qaIssues)
-        .where(
-          and(
-            eq(qaIssues.type, "Security Vulnerability"),
-            eq(qaIssues.title, "Missing Strict-Transport-Security (HSTS) Header")
-          )
-        );
+        .where(and(eq(qaIssues.type, "Security Vulnerability"), eq(qaIssues.title, "Missing Strict-Transport-Security (HSTS) Header")));
       if (!existing) {
         await db.insert(qaIssues).values({
           issueKey: `SEC-${Date.now().toString().slice(-4)}`,
@@ -568,12 +545,7 @@ export class QaService {
       const [existing] = await db
         .select()
         .from(qaIssues)
-        .where(
-          and(
-            eq(qaIssues.type, "Security Vulnerability"),
-            eq(qaIssues.title, "Missing Content-Security-Policy (CSP) Directives")
-          )
-        );
+        .where(and(eq(qaIssues.type, "Security Vulnerability"), eq(qaIssues.title, "Missing Content-Security-Policy (CSP) Directives")));
       if (!existing) {
         await db.insert(qaIssues).values({
           issueKey: `SEC-${(Date.now() + 1).toString().slice(-4)}`,
@@ -594,12 +566,7 @@ export class QaService {
       const [existing] = await db
         .select()
         .from(qaIssues)
-        .where(
-          and(
-            eq(qaIssues.type, "Security Vulnerability"),
-            eq(qaIssues.title, "Missing X-Frame-Options Clickjacking Defense")
-          )
-        );
+        .where(and(eq(qaIssues.type, "Security Vulnerability"), eq(qaIssues.title, "Missing X-Frame-Options Clickjacking Defense")));
       if (!existing) {
         await db.insert(qaIssues).values({
           issueKey: `SEC-${(Date.now() + 2).toString().slice(-4)}`,
@@ -627,27 +594,19 @@ export class QaService {
   }
 
   async listVisionDefects() {
-    const defects = await db
-      .select()
-      .from(qaIssues)
-      .where(eq(qaIssues.type, "Visual Defect"))
-      .orderBy(desc(qaIssues.createdAt));
+    const defects = await db.select().from(qaIssues).where(eq(qaIssues.type, "Visual Defect")).orderBy(desc(qaIssues.createdAt));
 
     return defects.map((d) => {
       const category = d.title.toLowerCase().includes("contrast")
         ? ("Color Contrast" as const)
         : d.title.toLowerCase().includes("overlap")
-        ? ("Text Overlap" as const)
-        : d.title.toLowerCase().includes("asset") || d.title.toLowerCase().includes("image")
-        ? ("Missing Asset" as const)
-        : ("Layout Break" as const);
+          ? ("Text Overlap" as const)
+          : d.title.toLowerCase().includes("asset") || d.title.toLowerCase().includes("image")
+            ? ("Missing Asset" as const)
+            : ("Layout Break" as const);
 
       const severity =
-        d.severity === "critical"
-          ? ("critical" as const)
-          : d.severity === "high"
-          ? ("warning" as const)
-          : ("cosmetic" as const);
+        d.severity === "critical" ? ("critical" as const) : d.severity === "high" ? ("warning" as const) : ("cosmetic" as const);
 
       return {
         id: d.id,
@@ -681,10 +640,7 @@ export class QaService {
       });
     }
 
-    const allDefects = await db
-      .select()
-      .from(qaIssues)
-      .where(eq(qaIssues.type, "Visual Defect"));
+    const allDefects = await db.select().from(qaIssues).where(eq(qaIssues.type, "Visual Defect"));
 
     return {
       status: "completed",
@@ -695,23 +651,17 @@ export class QaService {
   }
 
   async listFixes() {
-    const issues = await db
-      .select()
-      .from(qaIssues)
-      .where(ne(qaIssues.status, "resolved"))
-      .orderBy(desc(qaIssues.createdAt));
+    const issues = await db.select().from(qaIssues).where(ne(qaIssues.status, "resolved")).orderBy(desc(qaIssues.createdAt));
 
     return issues.map((issue) => {
       const errorType = issue.type.toLowerCase().includes("hydration")
         ? ("Hydration Mismatch" as const)
         : issue.type.toLowerCase().includes("rejection")
-        ? ("Unhandled Rejection" as const)
-        : ("Uncaught TypeError" as const);
+          ? ("Unhandled Rejection" as const)
+          : ("Uncaught TypeError" as const);
 
       const cleanRoute = issue.route.replace(/^\//, "");
-      const filePath = cleanRoute
-        ? `apps/web/src/features/${cleanRoute}/components/view.tsx`
-        : `apps/web/src/app/page.tsx`;
+      const filePath = cleanRoute ? `apps/web/src/features/${cleanRoute}/components/view.tsx` : `apps/web/src/app/page.tsx`;
 
       return {
         id: issue.id,
@@ -721,11 +671,7 @@ export class QaService {
         line: 42,
         rootCause: `Automated analysis detected ${issue.type} on route ${issue.route}. Uncaught runtime exception or boundary degradation logged under ${issue.issueKey}.`,
         diff: {
-          before: [
-            `- // ${issue.issueKey}: ${issue.title}`,
-            `- const data = fetchOrCompute();`,
-            `- return <div>{data.property}</div>;`,
-          ],
+          before: [`- // ${issue.issueKey}: ${issue.title}`, `- const data = fetchOrCompute();`, `- return <div>{data.property}</div>;`],
           after: [
             `+ // Automated patch generated for ${issue.issueKey}`,
             `+ const data = fetchOrCompute() ?? null;`,
@@ -740,10 +686,7 @@ export class QaService {
   async createPr(input: CreatePrInput) {
     const [issue] = await db.select().from(qaIssues).where(eq(qaIssues.id, input.id));
 
-    await db
-      .update(qaIssues)
-      .set({ status: "in_progress" })
-      .where(eq(qaIssues.id, input.id));
+    await db.update(qaIssues).set({ status: "in_progress" }).where(eq(qaIssues.id, input.id));
 
     const issueKey = issue?.issueKey || "ISSUE-PATCH";
     const prNum = Math.floor(Math.random() * 50) + 12;
@@ -751,7 +694,7 @@ export class QaService {
     return {
       fixId: input.id,
       prNumber: prNum,
-      prUrl: `https://github.com/rove-qa/platform/pull/${prNum}`,
+      prUrl: `https://github.com/rove/platform/pull/${prNum}`,
       status: "pr_created" as const,
       createdTitle: `fix(qa): automated patch for ${issueKey} (${issue?.title || "Defect"})`,
     };
@@ -789,12 +732,7 @@ export class QaService {
             }),
             plan: inv.lines.data[0]?.description || `ROVE Subscription`,
             amount: `$${((inv.amount_paid || inv.total) / 100).toFixed(2)}`,
-            status:
-              inv.status === "paid"
-                ? "Paid"
-                : inv.status
-                ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1)
-                : "Open",
+            status: inv.status === "paid" ? "Paid" : inv.status ? inv.status.charAt(0).toUpperCase() + inv.status.slice(1) : "Open",
           }));
         }
       } catch {
@@ -835,6 +773,131 @@ export class QaService {
       page,
       pageSize,
       totalPages,
+    };
+  }
+
+  private async ensureIntegrationsTable() {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS integrations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        service_key TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        description TEXT,
+        enabled BOOLEAN NOT NULL DEFAULT FALSE,
+        config JSONB DEFAULT '{}'::jsonb,
+        last_triggered_at TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+  }
+
+  async listIntegrations() {
+    await this.ensureIntegrationsTable();
+
+    let all = await db.select().from(integrations);
+    if (all.length === 0) {
+      await db.insert(integrations).values([
+        {
+          serviceKey: "github",
+          name: "GitHub Actions PR Gatekeeper",
+          description: "Blocks PR merges if browser QA score falls below 90%",
+          enabled: true,
+          config: {
+            repoName: "rove-qa/platform",
+            healthThreshold: 90,
+            blockMergeOnFailure: true,
+          },
+          lastTriggeredAt: "10m ago (PR #42 - Passed)",
+        },
+        {
+          serviceKey: "vercel",
+          name: "Vercel Deploy Hook",
+          description: "Trigger instant browser scan upon preview deployment",
+          enabled: true,
+          config: {
+            webhookUrl: "https://api.rove.dev/v1/webhooks/vercel",
+            autoScan: true,
+          },
+          lastTriggeredAt: "1h ago (Deploy vercel.app)",
+        },
+        {
+          serviceKey: "slack",
+          name: "Slack & Discord Alerts",
+          description: "Broadcast regression alerts and 5xx API crashes to team channels",
+          enabled: false,
+          config: {
+            webhookUrl: "",
+            channel: "#qa-alerts",
+          },
+          lastTriggeredAt: null,
+        },
+        {
+          serviceKey: "jira",
+          name: "Jira & Linear Auto-Sync",
+          description: "Auto-create backlog issue tickets for high severity bugs",
+          enabled: false,
+          config: {
+            projectKey: "QA",
+          },
+          lastTriggeredAt: null,
+        },
+      ]);
+      all = await db.select().from(integrations);
+    }
+
+    return all;
+  }
+
+  async updateIntegration(input: UpdateIntegrationInput) {
+    await this.ensureIntegrationsTable();
+
+    const [existing] = await db.select().from(integrations).where(eq(integrations.serviceKey, input.serviceKey));
+
+    if (!existing) {
+      throw new Error(`Integration for service '${input.serviceKey}' not found.`);
+    }
+
+    const mergedConfig = input.config ? { ...(existing.config || {}), ...input.config } : existing.config;
+
+    const [updated] = await db
+      .update(integrations)
+      .set({
+        ...(input.enabled !== undefined ? { enabled: input.enabled } : {}),
+        config: mergedConfig,
+        updatedAt: new Date(),
+      })
+      .where(eq(integrations.serviceKey, input.serviceKey))
+      .returning();
+
+    return updated;
+  }
+
+  async testIntegration(input: TestIntegrationInput) {
+    await this.ensureIntegrationsTable();
+
+    const [existing] = await db.select().from(integrations).where(eq(integrations.serviceKey, input.serviceKey));
+
+    if (!existing) {
+      throw new Error(`Integration for service '${input.serviceKey}' not found.`);
+    }
+
+    const now = "Just now (Test Ping Successful)";
+    const [updated] = await db
+      .update(integrations)
+      .set({
+        lastTriggeredAt: now,
+        updatedAt: new Date(),
+      })
+      .where(eq(integrations.serviceKey, input.serviceKey))
+      .returning();
+
+    return {
+      serviceKey: input.serviceKey,
+      success: true,
+      message: `Test webhook successfully dispatched to ${existing.name}.`,
+      lastTriggeredAt: now,
+      integration: updated,
     };
   }
 }

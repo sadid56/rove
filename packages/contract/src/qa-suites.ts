@@ -80,6 +80,29 @@ export const createPrSchema = z.object({
 export type RunVisionAuditInput = z.infer<typeof runVisionAuditSchema>;
 export type CreatePrInput = z.infer<typeof createPrSchema>;
 
+export const updateIntegrationSchema = z.object({
+  serviceKey: z.string().min(1, "Service key is required"),
+  enabled: z.boolean().optional(),
+  config: z
+    .object({
+      webhookUrl: z.string().optional(),
+      repoName: z.string().optional(),
+      channel: z.string().optional(),
+      healthThreshold: z.number().optional(),
+      blockMergeOnFailure: z.boolean().optional(),
+      autoScan: z.boolean().optional(),
+      projectKey: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const testIntegrationSchema = z.object({
+  serviceKey: z.string().min(1, "Service key is required"),
+});
+
+export type UpdateIntegrationInput = z.infer<typeof updateIntegrationSchema>;
+export type TestIntegrationInput = z.infer<typeof testIntegrationSchema>;
+
 export const listPaginationQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).optional().default(1),
@@ -143,5 +166,14 @@ export const qaContract = {
   },
   aiAssistant: {
     chat: oc.route({ method: "POST", path: "/qa/ai/chat", summary: "Ask Rove QA Assistant" }).input(aiChatSchema),
+  },
+  integrations: {
+    list: oc.route({ method: "GET", path: "/qa/integrations", summary: "List CI/CD and webhook integrations" }),
+    update: oc
+      .route({ method: "PATCH", path: "/qa/integrations/{serviceKey}", summary: "Update integration configuration or status" })
+      .input(updateIntegrationSchema),
+    test: oc
+      .route({ method: "POST", path: "/qa/integrations/{serviceKey}/test", summary: "Trigger test webhook delivery" })
+      .input(testIntegrationSchema),
   },
 };

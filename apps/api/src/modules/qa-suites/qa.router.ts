@@ -48,4 +48,10 @@ export const qaRouter = {
   aiAssistant: {
     chat: createProcedure(qaContract.aiAssistant.chat, (input) => qaService.aiChat(input)),
   },
+  integrations: {
+    list: createProcedure(qaContract.integrations.list, () => qaService.listIntegrations()),
+    update: createProcedure(qaContract.integrations.update, (input) => qaService.updateIntegration(input)),
+    test: createProcedure(qaContract.integrations.test, (input) => qaService.testIntegration(input)),
+  },
 };
+

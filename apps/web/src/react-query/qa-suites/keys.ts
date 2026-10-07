@@ -29,4 +29,8 @@ export const qaKeys = {
     get: () => [...qaKeys.billing.all, "get"] as const,
     invoices: (params?: any) => [...qaKeys.billing.all, "invoices", params] as const,
   },
+  integrations: {
+    all: ["qa", "integrations"] as const,
+    list: () => [...qaKeys.integrations.all, "list"] as const,
+  },
 };

@@ -11,6 +11,8 @@ import type {
   CreateCheckoutSessionInput,
   CreatePortalSessionInput,
   AiChatInput,
+  UpdateIntegrationInput,
+  TestIntegrationInput,
 } from "@repo/contract";
 
 export interface JourneyItem {
@@ -363,4 +365,50 @@ export function useBillingInvoices(params?: { page?: number; pageSize?: number }
     queryFn: () => (client as any).qa.billing.listInvoices(params) as Promise<BillingInvoicesResponse>,
   });
 }
+
+export interface IntegrationItem {
+  id: string;
+  serviceKey: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  config: {
+    webhookUrl?: string;
+    repoName?: string;
+    channel?: string;
+    healthThreshold?: number;
+    blockMergeOnFailure?: boolean;
+    autoScan?: boolean;
+    projectKey?: string;
+  } | null;
+  lastTriggeredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function useIntegrations() {
+  return useQuery({
+    queryKey: qaKeys.integrations.list(),
+    queryFn: () => (client as any).qa.integrations.list() as Promise<IntegrationItem[]>,
+  });
+}
+
+export function useUpdateIntegration() {
+  return useAppMutation<UpdateIntegrationInput>({
+    mutationFn: (data) => (client as any).qa.integrations.update(data),
+    invalidateKeys: [qaKeys.integrations.all as any],
+    successMessage: "Integration settings saved",
+    errorMessage: "Failed to update integration",
+  });
+}
+
+export function useTestIntegration() {
+  return useAppMutation<TestIntegrationInput>({
+    mutationFn: (data) => (client as any).qa.integrations.test(data),
+    invalidateKeys: [qaKeys.integrations.all as any],
+    successMessage: "Test payload sent successfully",
+    errorMessage: "Failed to test integration",
+  });
+}
+
 
