@@ -16,6 +16,7 @@ import {
 } from "@repo/ui";
 import { useProjects, useCreateProject, useDeleteProject } from "@/react-query/projects/actions";
 import { useTriggerScan } from "@/react-query/scans/actions";
+import { PageHeader } from "@/components/common";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -81,26 +82,21 @@ export function ProjectsView() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Monitored Projects
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Organize applications, manage scanning targets, and monitor deployment
-            health across repositories.
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsModalOpen(true)}
-          leftIcon={<Plus className="w-4 h-4" />}
-        >
-          Add Project
-        </Button>
-      </div>
+    <div className="space-y-6 w-full">
+      <PageHeader
+        title="Monitored Projects"
+        description="Organize applications, manage scanning targets, and monitor deployment health across repositories."
+        actions={
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setIsModalOpen(true)}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Add Project
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

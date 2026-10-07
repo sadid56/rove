@@ -156,7 +156,7 @@ export function ScanDetailView({ scanId }: { scanId: string }) {
   }
 
   return (
-    <div className='space-y-6 max-w-7xl mx-auto pb-12'>
+    <div className='space-y-6 w-full pb-12'>
       <ScanHeader
         scan={scan}
         isScanning={isScanning}

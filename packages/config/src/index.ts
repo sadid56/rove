@@ -74,6 +74,11 @@ export interface EnvironmentVariables {
   R2_BUCKET_NAME: string;
   R2_PUBLIC_URL: string;
 
+  // Stripe Billing & Payments
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PUBLISHABLE_KEY?: string;
+
   // Next.js Web App
   API_URL: string;
   NEXT_PUBLIC_APP_URL: string;
@@ -148,6 +153,10 @@ const NEXT_PUBLIC_APP_URL = raw.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const NEXT_PUBLIC_CDN_URL = (raw.NEXT_PUBLIC_CDN_URL || "http://localhost:4001").replace(/\/+$/, "");
 const NEXT_PUBLIC_R2_PUBLIC_URL = (raw.NEXT_PUBLIC_R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
+const STRIPE_SECRET_KEY = raw.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = raw.STRIPE_WEBHOOK_SECRET || "";
+const STRIPE_PUBLISHABLE_KEY = raw.STRIPE_PUBLISHABLE_KEY || "";
+
 export const appConfig = (): EnvironmentVariables => ({
   NODE_ENV,
   DATABASE_URL,
@@ -170,6 +179,9 @@ export const appConfig = (): EnvironmentVariables => ({
   R2_SECRET_ACCESS_KEY,
   R2_BUCKET_NAME,
   R2_PUBLIC_URL,
+  STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET,
+  STRIPE_PUBLISHABLE_KEY,
   API_URL,
   NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_CDN_URL,
@@ -200,6 +212,9 @@ export {
   R2_SECRET_ACCESS_KEY,
   R2_BUCKET_NAME,
   R2_PUBLIC_URL,
+  STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET,
+  STRIPE_PUBLISHABLE_KEY,
   API_URL,
   NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_CDN_URL,

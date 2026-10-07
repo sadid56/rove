@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { DashboardSidebar } from "@/components/layouts/sidebar";
 import { DashboardHeader } from "@/components/layouts/header";
-import { Sheet } from "@repo/ui";
+import { Sheet, Container } from "@repo/ui";
+import { AiAssistantWidget } from "@/features/ai-studio/components/ai-assistant-widget";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -18,9 +19,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <DashboardSidebar onClose={() => setMobileMenuOpen(false)} />
       </Sheet>
 
-      <div className='flex flex-col flex-1 min-w-0 overflow-hidden'>
+      <div className='flex flex-col flex-1 min-w-0 overflow-hidden relative'>
         <DashboardHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} />
-        <main className='flex-1 overflow-y-auto p-6 md:p-8'>{children}</main>
+        <main className='flex-1 overflow-y-auto py-6 md:py-8'>
+          <Container>{children}</Container>
+        </main>
+        <AiAssistantWidget />
       </div>
     </div>
   );

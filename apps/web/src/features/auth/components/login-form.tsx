@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
-import { Card, CardContent, Button, Input } from "@repo/ui";
+import { Card, CardContent, Button, Input, Label } from "@repo/ui";
 import { signInSchema, type SignInInput } from "@repo/contract";
 import { signIn } from "../actions";
 
@@ -60,7 +60,7 @@ export function LoginForm() {
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-foreground">Password</label>
+              <Label htmlFor="password-input">Password</Label>
               <Link
                 href="/forgot-password"
                 className="text-xs text-primary hover:underline"
@@ -69,6 +69,7 @@ export function LoginForm() {
               </Link>
             </div>
             <Input
+              id="password-input"
               type="password"
               placeholder="••••••••"
               leftIcon={<Lock className="w-4 h-4" />}

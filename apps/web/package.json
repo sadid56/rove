@@ -18,6 +18,7 @@
     "@repo/ui": "workspace:*",
     "@tanstack/react-query": "^5.66.11",
     "lucide-react": "^1.16.0",
+    "motion": "^14.0.0",
     "next": "16.3.8",
     "nuqs": "^2.10.1",
     "react": "19.2.8",

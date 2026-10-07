@@ -6,6 +6,7 @@ import { useScans } from "@/react-query/scans/actions";
 import { DashboardStats } from "./dashboard-stats";
 import { QuickScanCard } from "./quick-scan-card";
 import { RecentScansTable } from "./recent-scans-table";
+import { PageHeader } from "@/components/common";
 
 export function DashboardOverview() {
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1));
@@ -38,13 +39,11 @@ export function DashboardOverview() {
   }, [scans, totalScans]);
 
   return (
-    <div className='space-y-8 max-w-7xl mx-auto'>
-      <div>
-        <h1 className='text-2xl font-bold tracking-tight text-foreground'>QA Intelligence Overview</h1>
-        <p className='text-sm text-muted-foreground mt-1'>
-          Automated real-browser testing, route health analysis, and deployment regression monitoring.
-        </p>
-      </div>
+    <div className='space-y-8 w-full'>
+      <PageHeader
+        title="QA Intelligence Overview"
+        description="Automated real-browser testing, route health analysis, and deployment regression monitoring."
+      />
 
       {/* 1. Quick Launch Scan Card */}
       <QuickScanCard />

@@ -1,5 +1,6 @@
 import React from "react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@repo/ui";
+import { CheckCircle2, AlertTriangle, Terminal, AlertOctagon } from "lucide-react";
+import { StatCard } from "@/components/common";
 import type { ScanDetail } from "@/react-query/scans/actions";
 
 interface ScanMetricsProps {
@@ -12,38 +13,38 @@ export function ScanMetrics({ scan }: ScanMetricsProps) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <Card>
-        <CardHeader className="pb-1">
-          <CardDescription className="text-xs">Healthy Routes</CardDescription>
-          <CardTitle className="text-2xl text-success">
-            {scan.healthyRoutes}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardHeader className="pb-1">
-          <CardDescription className="text-xs">Failed Routes</CardDescription>
-          <CardTitle className="text-2xl text-destructive">
-            {scan.failedRoutes}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardHeader className="pb-1">
-          <CardDescription className="text-xs">Console Errors</CardDescription>
-          <CardTitle className="text-2xl text-warning">
-            {scan.summary?.consoleErrors ?? 0}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardHeader className="pb-1">
-          <CardDescription className="text-xs">Broken Assets / 5xx</CardDescription>
-          <CardTitle className="text-2xl text-primary">
-            {brokenCount}
-          </CardTitle>
-        </CardHeader>
-      </Card>
+      <StatCard
+        label="Healthy Routes"
+        value={scan.healthyRoutes}
+        icon={<CheckCircle2 className="w-4 h-4" />}
+        valueClass="text-success"
+        iconClass="text-success"
+        description="Passed all assertions"
+      />
+      <StatCard
+        label="Failed Routes"
+        value={scan.failedRoutes}
+        icon={<AlertTriangle className="w-4 h-4" />}
+        valueClass={scan.failedRoutes > 0 ? "text-destructive" : "text-foreground"}
+        iconClass={scan.failedRoutes > 0 ? "text-destructive" : "text-muted-foreground"}
+        description="Requires attention"
+      />
+      <StatCard
+        label="Console Errors"
+        value={scan.summary?.consoleErrors ?? 0}
+        icon={<Terminal className="w-4 h-4" />}
+        valueClass={(scan.summary?.consoleErrors ?? 0) > 0 ? "text-warning" : "text-foreground"}
+        iconClass={(scan.summary?.consoleErrors ?? 0) > 0 ? "text-warning" : "text-muted-foreground"}
+        description="Captured during crawl"
+      />
+      <StatCard
+        label="Broken Assets / 5xx"
+        value={brokenCount}
+        icon={<AlertOctagon className="w-4 h-4" />}
+        valueClass={brokenCount > 0 ? "text-primary" : "text-foreground"}
+        iconClass="text-primary"
+        description="Failed requests & asset loads"
+      />
     </div>
   );
 }

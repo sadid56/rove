@@ -31,6 +31,18 @@ const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Overview",
   projects: "Projects",
   scans: "Scans",
+  journeys: "User Journeys",
+  "visual-regression": "Visual Regression",
+  "api-monitor": "API Health Monitor",
+  personas: "Synthetic Personas",
+  security: "Security Sentinel",
+  "ai-audit": "AI Vision Audit",
+  "ai-fixes": "AI Fix Generator",
+  "ai-assistant": "Ask Rove Assistant",
+  issues: "Issue Tracker",
+  team: "Team & Roles",
+  integrations: "CI/CD & Integrations",
+  billing: "Billing & Plans",
   settings: "Settings",
 };
 

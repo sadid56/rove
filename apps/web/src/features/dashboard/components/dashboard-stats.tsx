@@ -1,6 +1,6 @@
 import React from "react";
 import { Activity, Layers, FileCode2, XCircle, type LucideIcon } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@repo/ui";
+import { StatCard } from "@/components/common";
 
 export interface DashboardStatsData {
   averageHealth: number;
@@ -63,20 +63,15 @@ export function DashboardStats({ stats }: { stats: DashboardStatsData }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {statItems.map((item) => (
-        <Card key={item.id} className="transition-all hover:border-border/80">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center justify-between">
-              <span className="font-medium text-xs text-muted-foreground">{item.label}</span>
-              <item.icon className={`w-4 h-4 ${item.iconClass || "text-muted-foreground"}`} />
-            </CardDescription>
-            <CardTitle className={`text-3xl font-bold tracking-tight ${item.valueClass || "text-foreground"}`}>
-              {item.value}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">{item.description}</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          key={item.id}
+          label={item.label}
+          value={item.value}
+          description={item.description}
+          icon={<item.icon className="w-4 h-4" />}
+          valueClass={item.valueClass}
+          iconClass={item.iconClass}
+        />
       ))}
     </div>
   );

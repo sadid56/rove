@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import {
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -19,6 +21,12 @@ import {
 } from "./table";
 import { Button } from "./button";
 import { Skeleton } from "./skeleton";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "./dropdown";
 
 export interface ColumnDef<TData> {
   id?: string;
@@ -111,21 +119,40 @@ export function DataTablePagination({
         {showPageSizeSelector && onPageSizeChange && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Rows per page</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-8 rounded-lg border border-border bg-secondary/50 px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 cursor-pointer"
-            >
-              {pageSizeOptions.map((size) => (
-                <option
-                  key={size}
-                  value={size}
-                  className="bg-card text-foreground"
-                >
-                  {size}
-                </option>
-              ))}
-            </select>
+            <Dropdown>
+              <DropdownTrigger className="h-8 rounded-lg border border-border bg-secondary/50 px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 hover:bg-secondary transition-colors gap-1.5 cursor-pointer">
+                {({ isOpen }) => (
+                  <>
+                    <span>{pageSize}</span>
+                    <ChevronDown
+                      className={cn(
+                        "w-3.5 h-3.5 text-muted-foreground transition-transform duration-200",
+                        isOpen && "rotate-180"
+                      )}
+                    />
+                  </>
+                )}
+              </DropdownTrigger>
+              <DropdownMenu align="left" side="top" className="min-w-[5.5rem] p-1">
+                {pageSizeOptions.map((size) => (
+                  <DropdownItem
+                    key={size}
+                    onClick={() => onPageSizeChange(size)}
+                    rightIcon={
+                      pageSize === size ? (
+                        <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                      ) : null
+                    }
+                    className={cn(
+                      "text-xs py-1.5 px-2.5",
+                      pageSize === size && "font-semibold text-foreground bg-accent/60"
+                    )}
+                  >
+                    {size}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
           </div>
         )}
       </div>

@@ -19,7 +19,7 @@ interface DropdownContextType {
 
 const DropdownContext = createContext<DropdownContextType | null>(null);
 
-function useDropdown() {
+export function useDropdown() {
   const context = useContext(DropdownContext);
   if (!context) {
     throw new Error("Dropdown components must be used within a <Dropdown>");
@@ -79,19 +79,27 @@ export function DropdownTrigger({
   children,
   className,
 }: {
-  children: ReactNode;
+  children: ReactNode | ((props: { isOpen: boolean }) => ReactNode);
   className?: string;
 }) {
   const { isOpen, setIsOpen } = useDropdown();
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => setIsOpen(!isOpen)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setIsOpen(!isOpen);
+        }
+      }}
       className={cn("cursor-pointer select-none inline-flex items-center", className)}
       aria-haspopup="true"
       aria-expanded={isOpen}
     >
-      {children}
+      {typeof children === "function" ? children({ isOpen }) : children}
     </div>
   );
 }
@@ -99,10 +107,12 @@ export function DropdownTrigger({
 export function DropdownMenu({
   children,
   align = "right",
+  side = "bottom",
   className,
 }: {
   children: ReactNode;
   align?: "left" | "right";
+  side?: "top" | "bottom";
   className?: string;
 }) {
   const { isOpen } = useDropdown();
@@ -112,7 +122,8 @@ export function DropdownMenu({
   return (
     <div
       className={cn(
-        "absolute z-50 mt-2 min-w-[12rem] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100",
+        "absolute z-50 min-w-[12rem] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100",
+        side === "top" ? "bottom-full mb-2" : "top-full mt-2",
         align === "right" ? "right-0" : "left-0",
         className
       )}
@@ -127,12 +138,14 @@ export function DropdownItem({
   children,
   onClick,
   icon,
+  rightIcon,
   variant = "default",
   className,
 }: {
   children: ReactNode;
   onClick?: () => void;
   icon?: ReactNode;
+  rightIcon?: ReactNode;
   variant?: "default" | "destructive";
   className?: string;
 }) {
@@ -156,8 +169,9 @@ export function DropdownItem({
         className
       )}
     >
-      {icon && <span className="text-current opacity-80">{icon}</span>}
+      {icon && <span className="text-current opacity-80 shrink-0">{icon}</span>}
       <span className="flex-1">{children}</span>
+      {rightIcon && <span className="text-current shrink-0">{rightIcon}</span>}
     </button>
   );
 }

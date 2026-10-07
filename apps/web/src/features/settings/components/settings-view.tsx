@@ -12,6 +12,7 @@ import {
   Input,
 } from "@repo/ui";
 import { getApiUrl } from "@/lib/env";
+import { PageHeader } from "@/components/common";
 
 export function SettingsView() {
   const [maxPages, setMaxPages] = useState("200");
@@ -26,15 +27,10 @@ export function SettingsView() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Settings & Configuration
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage your crawler policies, Playwright browser engine limits, and
-          platform preferences.
-        </p>
-      </div>
+      <PageHeader
+        title="Settings & Configuration"
+        description="Manage your crawler policies, Playwright browser engine limits, and platform preferences."
+      />
 
       <form onSubmit={handleSave} className="space-y-6">
         <Card>

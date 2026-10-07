@@ -8,6 +8,7 @@ import { Globe, ArrowRight, ShieldCheck, XCircle, AlertTriangle, CheckCircle2 } 
 import { Button, Badge, DataTable, type ColumnDef } from "@repo/ui";
 import { cn } from "@repo/ui";
 import { useScans, type ScanDetail } from "@/react-query/scans/actions";
+import { PageHeader } from "@/components/common";
 
 export function ScansView() {
   const router = useRouter();
@@ -116,13 +117,11 @@ export function ScansView() {
   );
 
   return (
-    <div className='space-y-6 max-w-7xl mx-auto'>
-      <div>
-        <h1 className='text-2xl font-bold tracking-tight text-foreground'>QA Scan History</h1>
-        <p className='text-sm text-muted-foreground mt-1'>
-          Review automated real-browser test results, regression signals, and route coverage.
-        </p>
-      </div>
+    <div className='space-y-6 w-full'>
+      <PageHeader
+        title="QA Scan History"
+        description="Review automated real-browser test results, regression signals, and route coverage."
+      />
 
       <DataTable
         columns={columns}

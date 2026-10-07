@@ -12,3 +12,7 @@ export * from "./logo";
 export * from "./data-table";
 export * from "./breadcrumb";
 export * from "./code-block";
+export * from "./label";
+export * from "./select";
+export * from "./container";
+

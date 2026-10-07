@@ -1,5 +1,8 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "../utils";
+import { Label } from "./label";
+
+export { Label, type LabelProps } from "./label";
 
 export interface InputProps extends ComponentProps<"input"> {
   label?: string;
@@ -7,6 +10,7 @@ export interface InputProps extends ComponentProps<"input"> {
   helperText?: string;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  required?: boolean;
 }
 
 export function Input({
@@ -17,6 +21,7 @@ export function Input({
   rightIcon,
   className,
   id,
+  required,
   ...props
 }: InputProps) {
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, "-") : undefined);
@@ -24,12 +29,9 @@ export function Input({
   return (
     <div className="w-full space-y-1.5">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-xs font-medium text-foreground select-none"
-        >
+        <Label htmlFor={inputId} required={required}>
           {label}
-        </label>
+        </Label>
       )}
       <div className="relative flex items-center">
         {leftIcon && (
